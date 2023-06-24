@@ -4,8 +4,10 @@
 
 #pragma once
 
-#include "basic_message.hpp"
+#include <any>
 #include <iterator>
+
+#include "message.hpp"
 
 class Descriptor {
 
@@ -16,4 +18,6 @@ class Reflection {
   virtual size_t FieldsSize() const = 0;
   virtual Reflection* Fields(size_t index) = 0;
   virtual const Reflection* Fields(size_t index) const = 0;
+  virtual std::any Value() = 0;
+  virtual std::any Value() const = 0;
 };

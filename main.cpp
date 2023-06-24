@@ -3,28 +3,7 @@
 #include <tuple>
 #include <type_traits>
 
-#include "basic_message.hpp"
-
-#define FIELD(name)                                                                          \
-  name##_;                                                                                   \
-                                                                                             \
- public:                                                                                     \
-  constexpr const decltype(name##_)& name() const { return name##_; }                        \
-  decltype(name##_)& mutable_##name() { return name##_; }                                    \
-  void set_##name(decltype(name##_) v) { name##_ = std::move(v); }                           \
-  static constexpr decltype(auto) FIELD_name(int32_constant<__LINE__>) { return #name; }     \
-  auto FIELD_type(int32_constant<__LINE__>)->decltype(test_field_);                          \
-  constexpr decltype(auto) FIELD_value(int32_constant<__LINE__>) { return (name##_); }       \
-  constexpr decltype(auto) FIELD_value(int32_constant<__LINE__>) const { return (name##_); } \
-  template <class Tp>                                                                        \
-  static constexpr int32_t FIELD_seq<__LINE__, Tp>
-
-#define DECLARE_FIELDS                     \
- public:                                   \
-  template <int32_t N, class>              \
-  static constexpr int32_t FIELD_seq = -1; \
-                                           \
- private:
+#include "liteproto/message.hpp"
 
 #define FIELD_X(name)                                                                    \
   name##_;                                                                               \
@@ -64,24 +43,18 @@ MESSAGE(TestMessage) {
 // };
 
 int main() {
-  constexpr auto arr = TestMessage::FieldsIndices::value;
-  constexpr char test_field_name[] = "test_field";
-  constexpr char test_field2_name[] = "test_field2";
 
-  static_assert(StrLiteralEQ(TestMessage::FIELD_name(int32_constant<arr[0].second>{}), test_field_name));
-  static_assert(StrLiteralEQ(TestMessage::FIELD_name(int32_constant<arr[1].second>{}), test_field2_name));
-
-  constexpr auto index0 = TestMessage::GetFieldIndexByName(test_field_name);
-  static_assert(index0 == arr[0]);
-  constexpr auto index1 = TestMessage::GetFieldIndexByName(test_field2_name);
-  static_assert(index1 == arr[1]);
-  auto v = TestMessage::GetFieldIndexByName("test_field3");
-  std::cout << v.first << ' ' << v.second;
 
   TestMessage msg{1, 2.5, 3.33};
   auto dumped = msg.DumpTuple();
   static_assert(std::tuple_size_v<decltype(dumped)> == 3);
-  std::cout << std::get<0>(dumped) << ' ' << std::get<1>(dumped) << ' ' << std::get<2>(dumped);
-  msg.test_field();
+  std::cout << std::get<0>(dumped) << ' ' << std::get<1>(dumped) << ' ' << std::get<2>(dumped) << std::endl;
+
+  msg.set_test_field(5);
+  msg.set_test_field2(msg.test_field2() + 1);
+  msg.set_test_field3(msg.test_field3() + 2);
+  dumped = msg.DumpTuple();
+  std::cout << std::get<0>(dumped) << ' ' << std::get<1>(dumped) << ' ' << std::get<2>(dumped) << std::endl;
+
   return 0;
 }

@@ -3,4 +3,7 @@ project(liteproto)
 
 set(CMAKE_CXX_STANDARD 17)
 
-add_executable(liteproto main.cpp basic_message.hpp reflection.hpp utils.hpp type.hpp)
+
+add_executable(liteproto main.cpp)
+
+target_include_directories(liteproto PUBLIC include)

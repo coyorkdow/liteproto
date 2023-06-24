@@ -4,6 +4,8 @@
 
 #pragma once
 
+namespace liteproto {
+
 template <int32_t N>
 using int32_constant = std::integral_constant<int32_t, N>;
 
@@ -134,3 +136,5 @@ auto SeqNumber(...) -> int32_constant<-1>;
 //                         concat1,
 //                         concat2);
 // }
+
+}  // namespace liteproto

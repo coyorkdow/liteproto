@@ -4,7 +4,12 @@
 
 #pragma
 
+#include <array>
+#include <map>
+#include <string>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 using uint8_t = uint8_t;
 using int8_t = int8_t;
@@ -14,6 +19,8 @@ using uint64_t = uint64_t;
 using int64_t = int64_t;
 using float_32_t = float;
 using float_64_t = double;
+
+namespace liteproto {
 
 enum class [[maybe_unused]] Kind : int32_t {
   UINT8,
@@ -48,3 +55,53 @@ enum class [[maybe_unused]] Kind : int32_t {
   TUPLE
 };
 
+template <class Tp>
+class List {
+ public:
+  virtual void push_back(Tp v) = 0;
+  virtual void push_front(Tp v) = 0;
+  virtual void pop_back() = 0;
+  virtual void pop_front() = 0;
+
+  virtual void insert(size_t pos, Tp v) = 0;
+  virtual void erase(size_t pos) = 0;
+
+  virtual Tp& operator[](size_t pos) = 0;
+  virtual const Tp& operator[](size_t pos) const = 0;
+
+  virtual size_t size() const = 0;
+  virtual bool empty() const = 0;
+  virtual void clear() = 0;
+};
+
+template <class Tp, template <class...> class C>
+class ListAdapter;
+
+template <class Tp>
+class ListAdapter<Tp, std::vector> : public List<Tp> {
+  using Container = std::vector<Tp>;
+
+ public:
+  void push_back(Tp v) override { container_.push_back(std::move(v)); }
+
+  void push_front(Tp v) override { container_.insert(container_.begin(), std::move(v)); }
+
+  void pop_back() override { container_.pop_back(); }
+
+  void pop_front() override { container_.erase(container_.begin()); }
+
+  virtual void insert(size_t pos, Tp v) = 0;
+  virtual void erase(size_t pos) = 0;
+
+  virtual Tp& operator[](size_t pos) = 0;
+  virtual const Tp& operator[](size_t pos) const = 0;
+
+  virtual size_t size() const = 0;
+  virtual bool empty() const = 0;
+  virtual void clear() = 0;
+
+ private:
+  Container container_;
+};
+
+}  // namespace liteproto
