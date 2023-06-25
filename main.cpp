@@ -43,7 +43,27 @@ MESSAGE(TestMessage) {
 // };
 
 int main() {
+  using namespace liteproto;
 
+  std::vector<std::string> strlist;
+  auto adapter = ListAdapter<decltype(strlist)>{strlist};
+  List<std::string>* list = &adapter;
+  for (int i = 0; i < 10; i++) {
+    list->push_back(std::to_string(i));
+  }
+  for (int i = 0; i < 5; i++) {
+    list->pop_back();
+  }
+  for (auto& v : *list) {
+    std::cout << v << ' ';
+    v.append("x");
+  }
+  std::cout << std::endl;
+  const auto& clist = *list;
+  for (auto& v : clist) {
+    std::cout << v << ' ';
+  }
+  std::cout << std::endl;
 
   TestMessage msg{1, 2.5, 3.33};
   auto dumped = msg.DumpTuple();
