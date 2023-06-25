@@ -28,42 +28,36 @@
 // #define MESSAGE2(name) class name : public MessageBasic2<name>
 
 MESSAGE(TestMessage) {
-  DECLARE_FIELDS
-
-  int FIELD(test_field) = 1;
-  double FIELD(test_field2) = 2;
-  float FIELD(test_field3) = 3;
+  int FIELD(test_field) -> Seq<1>;
+  double FIELD(test_field2) -> Seq<2>;
+  float FIELD(test_field3) -> Seq<3>;
 
   constexpr TestMessage(int v1, double v2, float v3) : test_field_(v1), test_field2_(v2), test_field3_(v3) {}
 };
-
-// MESSAGE2(TestMessage2) {
-//   int FIELD_X(test_field)->No<0>;
-//   double FIELD_X(test_field2)->No<1>;
-// };
 
 int main() {
   using namespace liteproto;
 
   std::vector<std::string> strlist;
-  auto adapter = ListAdapter<decltype(strlist)>{strlist};
-  List<std::string>* list = &adapter;
+  auto list = MakeList(strlist);
   for (int i = 0; i < 10; i++) {
-    list->push_back(std::to_string(i));
+    list.push_back(std::to_string(i));
   }
   for (int i = 0; i < 5; i++) {
-    list->pop_back();
+    list.pop_back();
   }
-  for (auto& v : *list) {
+  for (auto& v : list) {
     std::cout << v << ' ';
     v.append("x");
   }
   std::cout << std::endl;
-  const auto& clist = *list;
-  for (auto& v : clist) {
+  for (auto& v : list) {
     std::cout << v << ' ';
   }
   std::cout << std::endl;
+  std::list<std::string> strlist2;
+//  auto adapter2 = ListAdapter<decltype(strlist2)>{strlist2};
+//  list = &adapter2;
 
   TestMessage msg{1, 2.5, 3.33};
   auto dumped = msg.DumpTuple();

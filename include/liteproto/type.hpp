@@ -5,6 +5,7 @@
 #pragma
 
 #include <algorithm>
+#include <any>
 #include <array>
 #include <iterator>
 #include <map>
@@ -14,6 +15,7 @@
 #include <utility>
 #include <vector>
 
+#include "interface.hpp"
 #include "traits.hpp"
 #include "utils.hpp"
 
@@ -41,7 +43,7 @@ enum class [[maybe_unused]] Kind : int32_t {
 
   // Thees are four data structures abstraction that supported by liteproto: list, map, string, array.
 
-  // A list is a flexible-sized sequential container. The elements can be accessed by subscript operator (i.e.,
+  // A list is a flexible-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
   // operator[]), but no random accessible required. A list also supports push_back and pop_back, and inserts a
   // new element to arbitrary position.
   // A list also supports size(), empty(), and clear().
@@ -50,11 +52,11 @@ enum class [[maybe_unused]] Kind : int32_t {
   // corresponding key. A map uses get() to look up and update() to modify. A map also supports size(), empty(), and
   // clear().
   MAP,
-  // A string is almost the same as a list, except it doesn't be regarded as a container. A string is represented by a
-  // single value, like "123" or "abc". Since the String is not a container, the underlying type cannot be further
-  // inspected. A string supports all the operators that list supports.
+  // A string is almost the same as a list, except it doesn't be regarded as a container_type. A string is represented
+  // by a single value, like "123" or "abc". Since the String is not a container_type, the underlying type cannot be
+  // further inspected. A string supports all the operators that list supports.
   STRING,
-  // An array is a fixed-sized sequential container. The elements can be accessed by subscript operator (i.e.,
+  // An array is a fixed-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
   // operator[]). It doesn't support any other way to look up or modify. An array also supports size().
   ARRAY
 };
@@ -68,35 +70,10 @@ struct TypeMeta {
   }
 };
 
+enum class ConstOption : bool { NON_CONST = false, CONST = true };
+
 template <class Tp>
 class ListIterator;
-
-template <class Tp>
-class List {
- public:
-  virtual ~List() = default;
-
-  virtual void push_back(Tp v) = 0;
-  virtual void pop_back() = 0;
-
-  virtual void insert(size_t pos, Tp v) = 0;
-  virtual void erase(size_t pos) = 0;
-
-  virtual Tp& operator[](size_t pos) = 0;
-  virtual const Tp& operator[](size_t pos) const = 0;
-
-  virtual size_t size() const = 0;
-  virtual bool empty() const = 0;
-  virtual void clear() = 0;
-
-  using iterator = ListIterator<Tp>;
-  using const_iterator = ListIterator<const Tp>;
-
-  virtual iterator begin() = 0;
-  virtual iterator end() = 0;
-  virtual const_iterator begin() const = 0;
-  virtual const_iterator end() const = 0;
-};
 
 template <class Tp>
 class ListIteratorInterface {
@@ -115,6 +92,41 @@ class ListIteratorInterface {
   bool operator==(const ListIteratorInterface& rhs) const { return !(*this != rhs); }
 
   virtual uint64_t ContainerTypeId() const = 0;
+};
+
+template <class Tp, ConstOption ConstOpt = ConstOption::NON_CONST>
+class List;
+
+template <class Tp>
+class List<Tp, ConstOption::NON_CONST> {
+  template <class C, class>
+  friend auto MakeList(C& container);
+
+ public:
+  void push_back(Tp v) { interface_.push_back(obj_, std::move(v)); }
+  void pop_back() { interface_.pop_back(obj_); }
+
+  void insert(size_t pos, Tp v) { interface_.insert(obj_, pos, std::move(v)); }
+  void erase(size_t pos) { interface_.erase(obj_, pos); }
+
+  decltype(auto) operator[](size_t pos) { return interface_.operator_subscript(obj_, pos); }
+
+  size_t size() { return interface_.size(obj_); }
+  bool empty() { return interface_.empty(obj_); }
+  void clear() { return interface_.clear(obj_); }
+
+  using iterator = ListIterator<Tp>;
+  using const_iterator = ListIterator<const Tp>;
+
+  decltype(auto) begin() { return interface_.begin(obj_); }
+  decltype(auto) end() { return interface_.end(obj_); }
+
+ private:
+  template <class Adapter>
+  List(Adapter&& adapter, ListInterface<Tp> interface) : obj_(std::forward<Adapter>(adapter)), interface_(interface) {}
+
+  ListInterface<Tp> interface_;
+  std::any obj_;
 };
 
 template <class Tp, class Cond = void>
@@ -139,8 +151,8 @@ class ListIterator {
     iter_.reset(rhs.iter_->Copy());
     return *this;
   }
-  ListIterator(ListIterator&&) = default;
-  ListIterator& operator=(ListIterator&&) = default;
+  ListIterator(ListIterator&&) noexcept = default;
+  ListIterator& operator=(ListIterator&&) noexcept = default;
 
   reference operator*() { return **iter_; }
   pointer operator->() { return iter_->operator->(); }
@@ -170,12 +182,11 @@ template <template <class...> class C, class Tp, class... Os>
 class ListAdapter<
     C<Tp, Os...>,
     std::enable_if_t<has_push_back_v<C, Tp> && has_pop_back_v<C<Tp>> && has_size_v<C<Tp>> && has_empty_v<C<Tp>> &&
-                     has_clear_v<C<Tp>> && is_forward_iterable_v<C<Tp>> && has_insert_v<C, Tp> && has_erase_v<C<Tp>>>>
-    : public List<Tp> {
+                     has_clear_v<C<Tp>> && is_forward_iterable_v<C<Tp>> && has_insert_v<C, Tp> && has_erase_v<C<Tp>>>> {
   using base = List<Tp>;
 
  public:
-  using container = C<Tp, Os...>;  // TODO recursive container
+  using container_type = C<Tp, Os...>;  // TODO recursive container_type
   using value_type = Tp;
   using iterator = typename base::iterator;
   using const_iterator = typename base::const_iterator;
@@ -186,7 +197,7 @@ class ListAdapter<
     using base = ListIteratorInterface<V>;
     using pointer = typename base::pointer;
     using reference = typename base::reference;
-    using wrapped_iterator = typename container::iterator;
+    using wrapped_iterator = typename container_type::iterator;
 
    public:
     explicit Iterator(const wrapped_iterator& it) : it_(it) {
@@ -216,68 +227,78 @@ class ListAdapter<
   };
 
  public:
-  explicit ListAdapter(container& c) : container_(c) {}
-
-  void push_back(Tp v) override { container_.push_back(std::move(v)); }
-
-  void pop_back() override { container_.pop_back(); }
-
-  void insert(size_t pos, Tp v) override {
-    using std::begin;
-    auto it = begin(container_);
-    std::advance(it, pos);
-    container_.insert(it, std::move(v));
+  explicit ListAdapter(container_type* c) : container_(c) {
+    static_assert(std::is_copy_constructible<ListAdapter>::value);
+    static_assert(std::is_copy_assignable<ListAdapter>::value);
   }
 
-  void erase(size_t pos) override {
+  void push_back(Tp v) { container_->push_back(std::move(v)); }
+  void pop_back() { container_->pop_back(); }
+
+  void insert(size_t pos, Tp v) {
     using std::begin;
-    auto it = begin(container_);
+    auto it = begin(*container_);
     std::advance(it, pos);
-    container_.erase(it);
+    container_->insert(it, std::move(v));
   }
 
-  Tp& operator[](size_t pos) override {
+  void erase(size_t pos) {
     using std::begin;
-    auto it = begin(container_);
+    auto it = begin(*container_);
+    std::advance(it, pos);
+    container_->erase(it);
+  }
+
+  Tp& operator[](size_t pos) {
+    using std::begin;
+    auto it = begin(*container_);
     std::advance(it, pos);
     return *it;
   }
 
-  const Tp& operator[](size_t pos) const override {
+  const Tp& operator[](size_t pos) const {
     auto rm_const = const_cast<ListAdapter*>(this);
     return (*rm_const)[pos];
   }
 
-  size_t size() const override { return container_.size(); }
-  bool empty() const override { return container_.empty(); }
-  void clear() override { container_.clear(); }
+  size_t size() const { return container_->size(); }
+  bool empty() const { return container_->empty(); }
+  void clear() { container_->clear(); }
 
-  iterator begin() override {
+  iterator begin() {
     using interface = ListIteratorInterface<value_type>;
-    interface* ptr = new Iterator<value_type>(container_.begin());
+    interface* ptr = new Iterator<value_type>(container_->begin());
     return iterator{std::unique_ptr<interface>{ptr}};
   }
 
-  iterator end() override {
+  iterator end() {
     using interface = ListIteratorInterface<value_type>;
-    interface* ptr = new Iterator<value_type>(container_.end());
+    interface* ptr = new Iterator<value_type>(container_->end());
     return iterator{std::unique_ptr<interface>{ptr}};
   }
 
-  const_iterator begin() const override {
+  const_iterator begin() const {
     using interface = ListIteratorInterface<const value_type>;
-    interface* ptr = new Iterator<const value_type>(container_.begin());
+    interface* ptr = new Iterator<const value_type>(container_->begin());
     return const_iterator{std::unique_ptr<interface>{ptr}};
   }
 
-  const_iterator end() const override {
+  const_iterator end() const {
     using interface = ListIteratorInterface<const value_type>;
-    interface* ptr = new Iterator<const value_type>(container_.end());
+    interface* ptr = new Iterator<const value_type>(container_->end());
     return const_iterator{std::unique_ptr<interface>{ptr}};
   }
 
  private:
-  container& container_;
+  container_type* container_;
 };
+
+template <class C, class = ListAdapter<C>>
+auto MakeList(C& container) {
+  ListAdapter<C> adapter{&container};
+  using value_type = typename ListAdapter<C>::value_type;
+  List<value_type> list{std::move(adapter), MakeListInterface<value_type, decltype(adapter)>()};
+  return list;
+}
 
 }  // namespace liteproto

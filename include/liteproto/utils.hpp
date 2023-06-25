@@ -10,7 +10,7 @@ template <int32_t N>
 using int32_constant = std::integral_constant<int32_t, N>;
 
 template <int32_t N>
-using No = int32_constant<N>;
+using Seq = int32_constant<N>;
 
 using PII = std::pair<int32_t, int32_t>;
 
@@ -104,37 +104,32 @@ auto SeqNumber(int) -> decltype(Tp::FIELD_seq(int32_constant<N>{}));
 template <class Tp, int32_t N>
 auto SeqNumber(...) -> int32_constant<-1>;
 
-// template <class Tp, int32_t Now, int32_t End>
-// constexpr decltype(auto) GetAllFields2Impl() {
-//   if constexpr (Now == End) {
-//     return std::array<PII, 0>{};
-//   } else if constexpr (decltype(SeqNumber<Tp, Now>(0))::value != -1) {
-//     constexpr auto remains = GetAllFields2Impl<Tp, Now + 1, End>();
-//     return ConcatSTDArray(std::make_index_sequence<1>{}, std::make_index_sequence<remains.size()>{},
-//                           std::array<PII, 1>{PII{decltype(SeqNumber<Tp, Now>(0))::value, Now}}, remains);
-//   } else {
-//     return GetAllFields2Impl<Tp, Now + 1, End>();
-//   }
-// }
-//
-// template <class Tp>
-// constexpr decltype(auto) GetAllFields2() {
-//   constexpr auto res1 = GetAllFields2Impl<Tp, Tp::FIELDS_start, Tp::FIELDS_start + 128>();
-//   constexpr auto res2 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 128, Tp::FIELDS_start + 256>();
-//   constexpr auto res3 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 256, Tp::FIELDS_start + 384>();
-//   constexpr auto res4 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 384, Tp::FIELDS_start + 512>();
-//   constexpr auto concat1 = ConcatSTDArray(std::make_index_sequence<res1.size()>{},
-//                                           std::make_index_sequence<res2.size()>{},
-//                                           res1,
-//                                           res2);
-//   constexpr auto concat2 = ConcatSTDArray(std::make_index_sequence<res3.size()>{},
-//                                           std::make_index_sequence<res4.size()>{},
-//                                           res3,
-//                                           res4);
-//   return ConcatSTDArray(std::make_index_sequence<concat1.size()>{},
-//                         std::make_index_sequence<concat2.size()>{},
-//                         concat1,
-//                         concat2);
-// }
+template <class Tp, int32_t Now, int32_t End>
+constexpr decltype(auto) GetAllFields2Impl() {
+  if constexpr (Now == End) {
+    return std::array<PII, 0>{};
+  } else if constexpr (decltype(SeqNumber<Tp, Now>(0))::value != -1) {
+    constexpr auto remains = GetAllFields2Impl<Tp, Now + 1, End>();
+    return ConcatSTDArray(std::make_index_sequence<1>{}, std::make_index_sequence<remains.size()>{},
+                          std::array<PII, 1>{PII{decltype(SeqNumber<Tp, Now>(0))::value, Now}}, remains);
+  } else {
+    return GetAllFields2Impl<Tp, Now + 1, End>();
+  }
+}
+
+template <class Tp>
+constexpr decltype(auto) GetAllFields2() {
+  constexpr auto res1 = GetAllFields2Impl<Tp, Tp::FIELDS_start, Tp::FIELDS_start + 128>();
+  constexpr auto res2 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 128, Tp::FIELDS_start + 256>();
+  constexpr auto res3 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 256, Tp::FIELDS_start + 384>();
+  constexpr auto res4 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 384, Tp::FIELDS_start + 512>();
+  constexpr auto concat1 =
+      ConcatSTDArray(std::make_index_sequence<res1.size()>{}, std::make_index_sequence<res2.size()>{}, res1, res2);
+  constexpr auto concat2 =
+      ConcatSTDArray(std::make_index_sequence<res3.size()>{}, std::make_index_sequence<res4.size()>{}, res3, res4);
+  constexpr auto concat_final = ConcatSTDArray(std::make_index_sequence<concat1.size()>{},
+                                               std::make_index_sequence<concat2.size()>{}, concat1, concat2);
+  return SortSTDArray(std::make_index_sequence<concat_final.size()>{}, concat_final);
+}
 
 }  // namespace liteproto

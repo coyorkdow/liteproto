@@ -7,7 +7,8 @@ list(APPEND liteproto_headers
         include/liteproto/message.hpp
         include/liteproto/reflection.hpp
         include/liteproto/utils.hpp
-        include/liteproto/type.hpp)
+        include/liteproto/type.hpp
+        include/liteproto/interface.hpp)
 
 add_executable(liteproto main.cpp)
 
