@@ -9,6 +9,7 @@
 #include <list>
 #include <map>
 #include <queue>
+#include <set>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -22,6 +23,13 @@ auto HasSize(int) -> std::true_type;
 
 template <class>
 auto HasSize(float) -> std::false_type;
+
+template <class C, class = std::enable_if_t<
+                       std::is_convertible_v<std::invoke_result_t<decltype(&C::capacity), const C>, size_t>>>
+auto HasCapacity(int) -> std::true_type;
+
+template <class>
+auto HasCapacity(float) -> std::false_type;
 
 template <class C,
           class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::empty), const C>, bool>>>
@@ -96,7 +104,7 @@ auto HasInsert(float) -> std::false_type;
 //
 // For example,
 // The requirement of `C<Tp>.size()` is strict. It requires `&C<Tp>.size` is a pointer to member function.
-// It must be const, and the result type can be implicitly converted to the `size_t`.
+// It must be const, and the result type can be implicitly converted to the `size_const_t`.
 // The requirements of `C<Tp>.push_back(Tp)` is relaxed. Therefore, the following template is acceptable.
 // template <class Tp>
 // void push_back(Tp&& tp);
@@ -106,6 +114,12 @@ struct has_size : decltype(details::HasSize<C>(0)) {};
 
 template <class C>
 inline constexpr bool has_size_v = has_size<C>::value;
+
+template <class C>
+struct has_capacity : decltype(details::HasCapacity<C>(0)) {};
+
+template <class C>
+inline constexpr bool has_capacity_v = has_capacity<C>::value;
 
 template <class C>
 struct has_empty : decltype(details::HasEmpty<C>(0)) {};
@@ -155,7 +169,50 @@ struct has_insert : decltype(details::HasInsert<C, Tp>(0)) {};
 template <template <class...> class C, class Tp>
 inline constexpr bool has_insert_v = has_insert<C, Tp>::value;
 
+// For the traits of our own types, we use camel case instead of underscore case.
+
+template <class Tp, class Cond = void>
+struct IsList : std::false_type {};
+
+template <template <class...> class C, class V>
+struct IsList<
+    C<V>, std::enable_if_t<has_push_back_v<C, V> && has_pop_back_v<C<V>> && has_size_v<C<V>> && has_empty_v<C<V>> &&
+                           has_clear_v<C<V>> && is_forward_iterable_v<C<V>> && has_insert_v<C, V> && has_erase_v<C<V>>>>
+    : std::true_type {
+  using container_type = C<V>;
+  using value_type = V;
+};
+
+template <template <class...> class C, class V>
+struct IsList<const C<V>, std::enable_if_t<has_push_back_v<C, V> && has_pop_back_v<C<V>> && has_size_v<C<V>> &&
+                                           has_empty_v<C<V>> && has_clear_v<C<V>> && is_forward_iterable_v<C<V>> &&
+                                           has_insert_v<C, V> && has_erase_v<C<V>>>> : std::true_type {
+  using container_type = const C<V>;
+  using value_type = V;
+};
+
+template <class Tp>
+inline constexpr bool IsListV = IsList<Tp>::value;
+
+template <class Tp, class = std::bool_constant<IsListV<std::remove_reference_t<Tp>>>>
+struct ListTraits;
+
+template <class Tp>
+struct ListTraits<Tp, std::false_type> {};
+
+template <class Tp>
+struct ListTraits<Tp, std::true_type> {
+  using container_type = typename IsList<std::remove_reference_t<Tp>>::container_type;
+  using value_type = typename IsList<std::remove_reference_t<Tp>>::value_type;
+};
+
 namespace internal_test {
+
+static_assert(std::is_same_v<std::vector<int>, typename ListTraits<std::vector<int>&&>::container_type>);
+static_assert(std::is_same_v<int, typename ListTraits<std::vector<int>&&>::value_type>);
+
+static_assert(std::is_same_v<const std::deque<int>, typename ListTraits<const std::deque<int>&>::container_type>);
+static_assert(std::is_same_v<int, typename ListTraits<const std::vector<int>&&>::value_type>);
 
 static_assert(is_forward_iterator_v<std::list<int>::iterator>);
 static_assert(!is_forward_iterator_v<std::list<int>>);
@@ -164,6 +221,7 @@ static_assert(is_forward_iterable_v<std::list<int>>);
 static_assert(has_size_v<std::vector<int>>);
 static_assert(has_empty_v<std::vector<int>>);
 static_assert(has_clear_v<std::vector<int>>);
+static_assert(has_capacity_v<const std::vector<int>>);
 
 static_assert(has_push_back_v<std::vector, int>);
 static_assert(!has_push_back_v<std::queue, int>);

@@ -55,9 +55,21 @@ int main() {
     std::cout << v << ' ';
   }
   std::cout << std::endl;
-  std::list<std::string> strlist2;
-//  auto adapter2 = ListAdapter<decltype(strlist2)>{strlist2};
-//  list = &adapter2;
+  const auto& cref = strlist;
+  auto const_list = MakeList(cref);
+  for (int i = 0; i < const_list.size(); i++) {
+    assert(const_list[i].back() == 'x');
+  }
+
+  std::list<std::string> anol;
+  list = MakeList(anol);
+  std::cout << list.size() << '\n';
+  for (int i = 0; i < 5; i++) {
+    list.insert(list.size(), "no" + std::to_string(i));
+  }
+  for (auto& v : list) {
+    std::cout << v << ' ';
+  }
 
   TestMessage msg{1, 2.5, 3.33};
   auto dumped = msg.DumpTuple();

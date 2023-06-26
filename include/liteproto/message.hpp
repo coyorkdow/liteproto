@@ -8,8 +8,9 @@
 #include <iostream>
 #include <type_traits>
 
-#include "type.hpp"
-#include "utils.hpp"
+#include "liteproto/list.hpp"
+#include "liteproto/type.hpp"
+#include "liteproto/utils.hpp"
 
 namespace liteproto {
 
@@ -33,9 +34,10 @@ class MessageBase {
   }
 
   struct FieldsIndices {
-#if defined(__clang__)
+#if defined(__clang__) && !defined(LITE_PROTO_COMPATIBLE_MODE_)
     static constexpr auto value = GetAllFields<Msg>();
-#elif defined(__GNUC__) || defined(__GNUG__)
+// #elif defined(__GNUC__) || defined(__GNUG__)
+#else
     static constexpr auto value = GetAllFields2<Msg>();
 #endif
   };
@@ -60,7 +62,7 @@ class MessageBase {
   MESSAGE_DEF_HELPER(msg_name) \
   class msg_name : public liteproto::MessageBase<msg_name>, public MessageDefHelper_##msg_name
 
-#if defined(__clang__)
+#if defined(__clang__) && !defined(LITE_PROTO_COMPATIBLE_MODE_)
 #define FIELD(name)                                                                                     \
   name##_;                                                                                              \
                                                                                                         \
@@ -81,7 +83,8 @@ class MessageBase {
   static constexpr int32_t FIELD_seq = -1; \
                                            \
  private:
-#elif defined(__GNUC__) || defined(__GNUG__)
+// #elif defined(__GNUC__) || defined(__GNUG__)
+#else
 #define FIELD(name)                                                                                     \
   name##_;                                                                                              \
                                                                                                         \
