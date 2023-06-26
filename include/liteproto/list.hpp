@@ -5,8 +5,8 @@
 #pragma once
 
 #include "liteproto/interface.hpp"
-#include "liteproto/reflection/object.hpp"
-#include "liteproto/type.hpp"
+#include "liteproto/reflect/object.hpp"
+#include "liteproto/reflect/type.hpp"
 
 namespace liteproto {
 

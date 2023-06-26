@@ -9,7 +9,7 @@
 #include <type_traits>
 
 #include "liteproto/list.hpp"
-#include "liteproto/type.hpp"
+#include "liteproto/reflect/type.hpp"
 #include "liteproto/utils.hpp"
 
 namespace liteproto {
