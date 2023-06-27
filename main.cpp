@@ -75,7 +75,7 @@ int main() {
   assert(it != list.begin());
   assert(list.size() == 0);
   for (int i = 0; i < 5; i++) {
-    list.insert(list.size(), "no" + std::to_string(i));
+    list.insert(list.end(), "no" + std::to_string(i));
   }
   for (auto& v : list) {
     std::cout << v << ' ';
@@ -85,6 +85,15 @@ int main() {
   for (auto& v : anol) {
     std::cout << v << ' ';
   }
+  std::cout << std::endl;
+  while (!list.empty()) {
+    std::cout << *it << ' ';
+    it = list.erase(list.begin());
+  }
+  list.insert(list.begin(), "new str");
+  const_list = list;
+  std::cout << const_list.begin()->c_str();
+
   std::cout << std::endl;
 
   TestMessage msg{1, 2.5, 3.33};

@@ -20,16 +20,19 @@ struct ListInterface {
 
   using push_back_t = void(std::any&, Tp);
   using pop_back_t = void(std::any&);
-  using insert_t = void(std::any&, std::size_t, Tp);
-  using erase_t = void(std::any&, std::size_t);
+  using insert_t = iterator(std::any&, iterator, Tp);
+  using erase_t = iterator(std::any&, iterator);
   using operator_subscript_t = Tp&(std::any&, std::size_t);
-  using size_t = std::size_t(const std::any&);
+  using size_t = std::size_t(const std::any&) noexcept;
   using resize_t = void(std::any&, std::size_t);
   using resize_append_t = void(std::any&, std::size_t, const Tp&);
-  using empty_t = bool(const std::any&);
+  using empty_t = bool(const std::any&) noexcept;
   using clear_t = void(std::any&);
-  using begin_t = iterator(std::any&);
-  using end_t = iterator(std::any&);
+  using begin_t = iterator(std::any&) noexcept;
+  using end_t = iterator(std::any&) noexcept;
+
+  using const_interface_t = ListInterface<const Tp>() noexcept;
+  using to_const_t = std::any(const std::any&) noexcept;
 
   push_back_t* push_back;
   pop_back_t* pop_back;
@@ -43,6 +46,9 @@ struct ListInterface {
   clear_t* clear;
   begin_t* begin;
   end_t* end;
+
+  const_interface_t* const_interface;
+  to_const_t* to_const;
 };
 
 struct StringInterface : ListInterface<char> {
@@ -77,82 +83,91 @@ struct PairInterfaceImpl {
   }
 };
 
-template <class List, class Tp>
+template <class Adapter, class Tp>
 struct ListInterfaceImpl {
   using base = ListInterface<Tp>;
   using iterator = typename ListInterface<Tp>::iterator;
 
   static void push_back(std::any& obj, Tp v) {
-    auto* ptr = std::any_cast<List>(&obj);
+    auto* ptr = std::any_cast<Adapter>(&obj);
     (*ptr).push_back(std::move(v));
   }
   static_assert(std::is_same_v<decltype(push_back), typename base::push_back_t>);
 
   static void pop_back(std::any& obj) {
-    auto* ptr = std::any_cast<List>(&obj);
+    auto* ptr = std::any_cast<Adapter>(&obj);
     (*ptr).pop_back();
   }
   static_assert(std::is_same_v<decltype(pop_back), typename base::pop_back_t>);
 
-  static void insert(std::any& obj, size_t pos, Tp v) {
-    auto* ptr = std::any_cast<List>(&obj);
-    (*ptr).insert(pos, std::move(v));
+  static iterator insert(std::any& obj, iterator pos, Tp v) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).insert(std::move(pos), std::move(v));
   }
   static_assert(std::is_same_v<decltype(insert), typename base::insert_t>);
 
-  static void erase(std::any& obj, size_t pos) {
-    auto* ptr = std::any_cast<List>(&obj);
-    (*ptr).erase(pos);
+  static iterator erase(std::any& obj, iterator pos) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).erase(std::move(pos));
   }
   static_assert(std::is_same_v<decltype(erase), typename base::erase_t>);
 
   static Tp& operator_subscript(std::any& obj, size_t pos) {
-    auto* ptr = std::any_cast<List>(&obj);
+    auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr)[pos];
   }
   static_assert(std::is_same_v<decltype(operator_subscript), typename base::operator_subscript_t>);
 
-  static size_t size(const std::any& obj) {
-    auto* ptr = std::any_cast<List>(&obj);
+  static size_t size(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr).size();
   }
   static_assert(std::is_same_v<decltype(size), typename base::size_t>);
 
   static void resize(std::any& obj, size_t count) {
-    auto* ptr = std::any_cast<List>(&obj);
+    auto* ptr = std::any_cast<Adapter>(&obj);
     (*ptr).resize(count);
   }
   static_assert(std::is_same_v<decltype(resize), typename base::resize_t>);
 
   static void resize_append(std::any& obj, size_t count, const Tp& v) {
-    auto* ptr = std::any_cast<List>(&obj);
+    auto* ptr = std::any_cast<Adapter>(&obj);
     (*ptr).resize(count, v);
   }
   static_assert(std::is_same_v<decltype(resize_append), typename base::resize_append_t>);
 
-  static bool empty(const std::any& obj) {
-    auto* ptr = std::any_cast<List>(&obj);
+  static bool empty(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr).empty();
   }
   static_assert(std::is_same_v<decltype(empty), typename base::empty_t>);
 
   static void clear(std::any& obj) {
-    auto* ptr = std::any_cast<List>(&obj);
+    auto* ptr = std::any_cast<Adapter>(&obj);
     (*ptr).clear();
   }
   static_assert(std::is_same_v<decltype(clear), typename base::clear_t>);
 
-  static iterator begin(std::any& obj) {
-    auto* ptr = std::any_cast<List>(&obj);
+  static iterator begin(std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr).begin();
   }
   static_assert(std::is_same_v<decltype(begin), typename base::begin_t>);
 
-  static iterator end(std::any& obj) {
-    auto* ptr = std::any_cast<List>(&obj);
+  static iterator end(std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr).end();
   }
   static_assert(std::is_same_v<decltype(end), typename base::end_t>);
+
+  static ListInterface<const Tp> ConstInterface() noexcept;
+  static_assert(std::is_same_v<decltype(ConstInterface), typename base::const_interface_t>);
+
+  static std::any ToConst(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).ToConst();
+  }
+  static_assert(std::is_same_v<decltype(ToConst), typename base::to_const_t>);
 };
 
 template <class Str>
@@ -189,7 +204,16 @@ auto MakeListInterface() {
   interface.clear = &impl::clear;
   interface.begin = &impl::begin;
   interface.end = &impl::end;
+
+  interface.const_interface = &impl::ConstInterface;
+  interface.to_const = &impl::ToConst;
   return interface;
+}
+
+template <class Adapter, class Tp>
+ListInterface<const Tp> ListInterfaceImpl<Adapter, Tp>::ConstInterface() noexcept {
+  using const_adapter = typename Adapter::const_adapter;
+  return MakeListInterface<const_adapter>();
 }
 
 template <class Adapter>

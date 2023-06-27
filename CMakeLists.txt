@@ -12,6 +12,8 @@ list(APPEND liteproto_headers
         include/liteproto/list.hpp
         include/liteproto/reflect/object.hpp)
 
+add_compile_options(-g)
+
 add_executable(liteproto main.cpp)
 
 target_include_directories(liteproto PUBLIC include)

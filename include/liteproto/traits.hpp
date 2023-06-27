@@ -325,6 +325,18 @@ struct ListTraits<const C<V, Tps...>, std::enable_if_t<internal::is_list<C<V>, V
   using value_type = V;
 };
 
+template <template <class, auto...> class C, class V, auto... Args>
+struct ListTraits<C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> : std::true_type {
+  using container_type = C<V, Args...>;
+  using value_type = V;
+};
+
+template <template <class, auto...> class C, class V, auto... Args>
+struct ListTraits<const C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> : std::true_type {
+  using container_type = const C<V, Args...>;
+  using value_type = V;
+};
+
 template <class Tp, class Cond = void>
 struct IsList : std::false_type {};
 
@@ -394,7 +406,7 @@ struct IsPair<const Pair> : decltype(details::IsPair<Pair>(0)) {};
 template <class Pair>
 inline constexpr bool IsPairV = IsPair<Pair>::value;
 
-template <class Pair, class = std::bool_constant<IsPairV<std::remove_reference_t<Pair>>>>
+template <class Pair, class = std::bool_constant<IsPairV<Pair>>>
 struct PairTraits;
 
 template <class Pair>

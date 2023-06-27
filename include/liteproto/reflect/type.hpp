@@ -172,14 +172,11 @@ struct DescriptorInterface {
   value_type_t* value_type_;
 };
 
-template <class Tp>
-struct TypeMeta;
-
 }  // namespace internal
 
 class TypeDescriptor {
   template <class Tp>
-  friend class internal::TypeMeta;
+  friend class TypeMeta;
 
  public:
   uint64_t Id() const noexcept { return inter_.id_(); }
@@ -203,12 +200,10 @@ class TypeDescriptor {
   internal::DescriptorInterface inter_;
 };
 
-namespace internal {
-
 template <class Tp>
 struct TypeMeta {
   static TypeDescriptor MakeDescriptor() noexcept {
-    DescriptorInterface inter{};
+    internal::DescriptorInterface inter{};
     inter.id_ = &Id;
     inter.size_of_ = &SizeOf;
     inter.alignment_of_ = &AlignmentOf;
@@ -291,10 +286,12 @@ struct TypeMeta {
       return Kind::SCALAR;
     } else if constexpr (IsStringV<Tp>) {
       return Kind::STRING;
-    } else if constexpr (std::is_array_v<Tp>) {
-      return Kind::ARRAY;
     } else if constexpr (IsListV<Tp>) {
       return Kind::LIST;
+    } else if constexpr (IsArrayV<Tp>) {
+      return Kind::ARRAY;
+    } else if constexpr (IsPairV<Tp>) {
+      return Kind::PAIR;
     }
 
     return Kind::OTHER;
@@ -386,11 +383,7 @@ struct TypeMeta {
 #undef LITE_PROTO_TRAITS_CASE_
     }
   }
-
-  static constexpr bool IsList() { return IsListV<Tp>; }
 };
-
-}  // namespace internal
 
 enum class ConstOption : bool { NON_CONST = false, CONST = true };
 

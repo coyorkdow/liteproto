@@ -121,6 +121,20 @@ class IteratorAdapter {
 
   uint64_t AdapterTypeId() const { return TypeMeta<IteratorAdapter>::Id(); }
 
+  IteratorAdapter& InsertMyself(container_type* container, value_type v) {
+    if constexpr (!std::is_const_v<container_type>) {
+      it_ = container->insert(it_, std::move(v));
+    }
+    return *this;
+  }
+
+  IteratorAdapter& EraseMyself(container_type* container) {
+    if constexpr (!std::is_const_v<container_type>) {
+      it_ = container->erase(it_);
+    }
+    return *this;
+  }
+
  private:
   wrapped_iterator it_;
 };
