@@ -29,9 +29,9 @@
 // #define MESSAGE2(name) class name : public MessageBasic2<name>
 
 MESSAGE(TestMessage) {
-  int FIELD(test_field) -> Seq<1>;
-  double FIELD(test_field2) -> Seq<2>;
-  float FIELD(test_field3) -> Seq<3>;
+  int FIELD(test_field)->Seq<1>;
+  double FIELD(test_field2)->Seq<2>;
+  float FIELD(test_field3)->Seq<3>;
 
   constexpr TestMessage(int v1, double v2, float v3) : test_field_(v1), test_field2_(v2), test_field3_(v3) {}
 };
@@ -64,8 +64,11 @@ int main() {
     assert(const_list[i].back() == 'x');
   }
 
+  Iterator<std::string> it = list.begin();
+
   std::list<std::string> anol;
   list = MakeList(anol);
+  assert(it != list.begin());
   std::cout << list.size() << '\n';
   for (int i = 0; i < 5; i++) {
     list.insert(list.size(), "no" + std::to_string(i));
@@ -76,7 +79,7 @@ int main() {
   std::cout << std::endl;
   list.resize(10, "abc");
   for (auto& v : anol) {
-    std::cout << v <<  ' ';
+    std::cout << v << ' ';
   }
   std::cout << std::endl;
 

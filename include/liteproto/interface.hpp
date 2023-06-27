@@ -5,19 +5,18 @@
 #pragma once
 
 #include <any>
-
-#include "liteproto/traits.hpp"
+#include <type_traits>
 
 namespace liteproto {
 
 template <class Tp>
-class ListIterator;
+class Iterator;
 
 namespace internal {
 
 template <class Tp>
 struct ListInterface {
-  using iterator = ListIterator<Tp>;
+  using iterator = Iterator<Tp>;
 
   using push_back_t = void(std::any&, Tp);
   using pop_back_t = void(std::any&);
@@ -61,6 +60,21 @@ struct PairInterface {
 
   car_t* car;
   cdr_t* cdr;
+};
+
+template <class Pair, class Car, class Cdr>
+struct PairInterfaceImpl {
+  using base = PairInterface<Car, Cdr>;
+
+  static Car& CAR(std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Pair>(&obj);
+    return (*ptr).first();
+  }
+
+  static Cdr& CDR(std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Pair>(&obj);
+    return (*ptr).second();
+  }
 };
 
 template <class List, class Tp>
