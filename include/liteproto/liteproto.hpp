@@ -5,6 +5,8 @@
 #pragma once
 
 #include "message.hpp"
+#include "pair.hpp"
+#include "reflect.hpp"
 
 #define MESSAGE_DEF_HELPER(msg_name)                  \
   struct MessageDefHelper_##msg_name {                \

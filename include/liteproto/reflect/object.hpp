@@ -12,9 +12,6 @@
 #include "liteproto/reflect/type.hpp"
 #include "liteproto/traits.hpp"
 
-#include "liteproto/list.hpp"
-#include "liteproto/pair.hpp"
-
 namespace liteproto {
 
 static_assert(sizeof(void*) == 4 || sizeof(void*) == 8);
@@ -54,7 +51,7 @@ class Object {
  private:
   TypeDescriptor descriptor_;
   std::any ptr_to_value_;
-  std::any view_;
+  std::any interface_;
   void* addr_;
 };
 

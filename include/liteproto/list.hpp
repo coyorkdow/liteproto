@@ -18,7 +18,7 @@ class List;
 template <class Tp>
 class List<Tp, ConstOption::NON_CONST> {
   template <class C, class>
-  friend auto MakeList(C&& container);
+  friend auto AsList(C&& container);
 
  public:
   void push_back(Tp v) const { interface_.push_back(obj_, std::move(v)); }
@@ -56,7 +56,7 @@ class List<Tp, ConstOption::NON_CONST> {
 template <class Tp>
 class List<Tp, ConstOption::CONST> {
   template <class C, class>
-  friend auto MakeList(C&& container);
+  friend auto AsList(C&& container);
 
  public:
   decltype(auto) operator[](size_t pos) const { return interface_.operator_subscript(obj_, pos); }
@@ -179,7 +179,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 }  // namespace internal
 
 template <class C, class = internal::ListAdapter<std::remove_reference_t<C>>>
-auto MakeList(C&& container) {
+auto AsList(C&& container) {
   using ref_removed = std::remove_reference_t<C>;
   internal::ListAdapter<ref_removed> adapter{&container};
 

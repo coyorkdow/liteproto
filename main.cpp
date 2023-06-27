@@ -42,7 +42,7 @@ int main() {
   using namespace liteproto;
 
   std::vector<std::string> strlist;
-  auto list = MakeList(strlist);
+  auto list = AsList(strlist);
   for (int i = 0; i < 10; i++) {
     list.push_back(std::to_string(i));
   }
@@ -59,17 +59,21 @@ int main() {
   }
   std::cout << std::endl;
   const auto& cref = strlist;
-  auto const_list = MakeList(cref);
+  auto const_list = AsList(cref);
   for (int i = 0; i < const_list.size(); i++) {
     assert(const_list[i].back() == 'x');
   }
+  for (auto it = const_list.begin(); it != const_list.end(); it++) {
+    std::cout << *it << ' ';
+  }
+  std::cout << std::endl;
 
   Iterator<std::string> it = list.begin();
 
   std::list<std::string> anol;
-  list = MakeList(anol);
+  list = AsList(anol);
   assert(it != list.begin());
-  std::cout << list.size() << '\n';
+  assert(list.size() == 0);
   for (int i = 0; i < 5; i++) {
     list.insert(list.size(), "no" + std::to_string(i));
   }

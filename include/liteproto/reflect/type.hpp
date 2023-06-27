@@ -27,7 +27,8 @@ using size_t = std::size_t;
 
 namespace liteproto {
 
-enum class Kind : int32_t {
+enum class Type : int32_t {
+  VOID,
   UINT8,
   INT8,
   UINT32,
@@ -38,44 +39,21 @@ enum class Kind : int32_t {
   FLOAT_64,
   BOOLEAN,
 
-  SCALAR,
   ARRAY,
 
+  MESSAGE,
+
   STD_VECTOR,
+  STD_DEQUE,
+  STD_LIST,
   STD_MAP,
+  STD_UNORDERED_MAP,
   STD_STRING,
   STD_ARRAY,
 
+  STD_ANY,
+
   OTHER
-};
-
-// Thees are four data structures abstraction that supported by liteproto: list, map, string, array.
-
-// A list is a flexible-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
-// operator[]), but no random accessible required. A list also supports push_back and pop_back, and inserts a
-// new element to arbitrary position.
-// A list also supports size(), empty(), and clear().
-
-// A map is an key-value pairs collection. Each key must be unique in a map, and the value can be looked up via the
-// corresponding key. A map uses get() to look up and update() to modify. A map also supports size(), empty(), and
-// clear().
-
-// A string is almost the same as a list, except it doesn't be regarded as a container_type. A string is represented
-// by a single value, like "123" or "abc". Since the String is not a container_type, the underlying type cannot be
-// further inspected. A string supports all the operators that list supports.
-
-// An array is a fixed-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
-// operator[]). It doesn't support any other way to look up or modify. An array also supports size().
-
-enum class Type : int8_t { SCALAR, POINTER, LIST, MAP, STRING, ARRAY, MESSAGE, OTHER };
-
-template <class Tp>
-struct TypeMeta {
-  static uint64_t Id() {
-    static uint64_t alloc_addr = 0;
-    uint64_t* addr = &alloc_addr;
-    return *reinterpret_cast<uint64_t*>(&addr);
-  }
 };
 
 enum class traits : uint8_t {
@@ -180,7 +158,6 @@ struct DescriptorInterface {
   using extent_t = size_t();
 
   using value_type_t = TypeDescriptor();
-  using kv_type_t = std::pair<TypeDescriptor, TypeDescriptor>();
 
   id_t* id_;
   kinde_enum_t* kind_;
@@ -193,7 +170,6 @@ struct DescriptorInterface {
   extent_t* extent_;
 
   value_type_t* value_type_;
-  kv_type_t* kv_type_;
 };
 
 template <class Tp>
@@ -218,7 +194,6 @@ class TypeDescriptor {
   size_t Extent() const noexcept { return inter_.extent_(); }
 
   TypeDescriptor ValueType() const noexcept { return inter_.value_type_(); }
-  std::pair<TypeDescriptor, TypeDescriptor> KVType() const noexcept { return inter_.kv_type_(); }
 
   bool operator==(const TypeDescriptor& rhs) const { return Id() == rhs.Id(); }
   bool operator!=(const TypeDescriptor& rhs) const { return Id() != rhs.Id(); }
@@ -232,7 +207,7 @@ namespace internal {
 
 template <class Tp>
 struct TypeMeta {
-  static TypeDescriptor MakeInterface() noexcept {
+  static TypeDescriptor MakeDescriptor() noexcept {
     DescriptorInterface inter{};
     inter.id_ = &Id;
     inter.size_of_ = &SizeOf;
@@ -244,8 +219,7 @@ struct TypeMeta {
     inter.traits_ = &Traits;
     inter.transform_ = &Transform;
 
-//    inter.value_type_ = &ValueType;
-//    inter.kv_type_ = &KVType;
+    inter.value_type_ = &ValueType;
 
     return TypeDescriptor{inter};
   }
@@ -266,54 +240,85 @@ struct TypeMeta {
   // along its first dimension and N is 0, value is 0.
   static constexpr size_t Extent() noexcept { return std::extent_v<Tp>; }
 
-  static TypeDescriptor Transform(transform t) noexcept;
+  static TypeDescriptor Transform(transform t) noexcept {
+    switch (t) {
+      case transform::remove_const:
+        return remove_const();
+      case transform::remove_volatile:
+        return remove_volatile();
+      case transform::remove_reference:
+        return remove_reference();
+      case transform::remove_pointer:
+        return remove_pointer();
+      case transform::remove_extent:
+        return remove_extent();
+      case transform::remove_all_extents:
+        return remove_all_extents();
+    }
+  }
 
-  static TypeDescriptor remove_const() noexcept { using next_meta = TypeMeta<std::remove_const_t<Tp>>; }
-  static TypeDescriptor remove_volatile() noexcept { using next_meta = TypeMeta<std::remove_volatile_t<Tp>>; }
-  static TypeDescriptor remove_reference() noexcept { using next_meta = TypeMeta<std::remove_reference_t<Tp>>; }
-  static TypeDescriptor remove_pointer() noexcept { using next_meta = TypeMeta<std::remove_pointer_t<Tp>>; }
-  static TypeDescriptor remove_extent() noexcept { using next_meta = TypeMeta<std::remove_extent_t<Tp>>; }
-  static TypeDescriptor remove_all_extents() noexcept { using next_meta = TypeMeta<std::remove_all_extents_t<Tp>>; }
+  static TypeDescriptor remove_const() noexcept {
+    using next_meta = TypeMeta<std::remove_const_t<Tp>>;
+    return next_meta::MakeDescriptor();
+  }
+  static TypeDescriptor remove_volatile() noexcept {
+    using next_meta = TypeMeta<std::remove_volatile_t<Tp>>;
+    return next_meta::MakeDescriptor();
+  }
+  static TypeDescriptor remove_reference() noexcept {
+    using next_meta = TypeMeta<std::remove_reference_t<Tp>>;
+    return next_meta::MakeDescriptor();
+  }
+  static TypeDescriptor remove_pointer() noexcept {
+    using next_meta = TypeMeta<std::remove_pointer_t<Tp>>;
+    return next_meta::MakeDescriptor();
+  }
+  static TypeDescriptor remove_extent() noexcept {
+    using next_meta = TypeMeta<std::remove_extent_t<Tp>>;
+    return next_meta::MakeDescriptor();
+  }
+  static TypeDescriptor remove_all_extents() noexcept {
+    using next_meta = TypeMeta<std::remove_all_extents_t<Tp>>;
+    return next_meta::MakeDescriptor();
+  }
 
   static constexpr TypeDescriptor ValueType() noexcept;
 
-  static constexpr std::pair<TypeDescriptor, TypeDescriptor> KVType();
-
-  static constexpr Type TypeEnum() {
+  static constexpr Kind KindEnum() {
     if constexpr (std::is_pointer_v<Tp>) {
-      return Type::POINTER;
-    } else if constexpr (std::is_scalar_v<Tp>) {
-      return Type::SCALAR;
-    } else if constexpr (std::is_array_v<Tp>) {
-      return Type::ARRAY;
-    } else if constexpr (IsListV<Tp>) {
-      return Type::LIST;
-    }
-
-    return Type::OTHER;
-  }
-
-  static constexpr Kind KindEnum() noexcept {
-    if constexpr (std::is_same_v<Tp, uint8_t>) {
-      return Kind::UINT8;
-    } else if constexpr (std::is_same_v<Tp, int8_t>) {
-      return Kind::INT8;
-    } else if constexpr (std::is_same_v<Tp, uint32_t>) {
-      return Kind::UINT32;
-    } else if constexpr (std::is_same_v<Tp, int32_t>) {
-      return Kind::INT32;
-    } else if constexpr (std::is_same_v<Tp, uint64_t>) {
-      return Kind::UINT64;
-    } else if constexpr (std::is_same_v<Tp, int64_t>) {
-      return Kind::INT64;
-    } else if constexpr (std::is_same_v<Tp, float>) {
-      return Kind::FLOAT_32;
-    } else if constexpr (std::is_same_v<Tp, double>) {
-      return Kind::FLOAT_64;
+      return Kind::POINTER;
     } else if constexpr (std::is_scalar_v<Tp>) {
       return Kind::SCALAR;
+    } else if constexpr (IsStringV<Tp>) {
+      return Kind::STRING;
     } else if constexpr (std::is_array_v<Tp>) {
       return Kind::ARRAY;
+    } else if constexpr (IsListV<Tp>) {
+      return Kind::LIST;
+    }
+
+    return Kind::OTHER;
+  }
+
+  static constexpr Type TypeEnum() noexcept {
+    if constexpr (std::is_same_v<Tp, uint8_t>) {
+      return Type::UINT8;
+    } else if constexpr (std::is_same_v<Tp, int8_t>) {
+      return Type::INT8;
+    } else if constexpr (std::is_same_v<Tp, uint32_t>) {
+      return Type::UINT32;
+    } else if constexpr (std::is_same_v<Tp, int32_t>) {
+      return Type::INT32;
+    } else if constexpr (std::is_same_v<Tp, uint64_t>) {
+      return Type::UINT64;
+    } else if constexpr (std::is_same_v<Tp, int64_t>) {
+      return Type::INT64;
+    } else if constexpr (std::is_same_v<Tp, float>) {
+      return Type::FLOAT_32;
+    } else if constexpr (std::is_same_v<Tp, double>) {
+      return Type::FLOAT_64;
+    } else if constexpr (std::is_array_v<Tp>) {
+      return Type::ARRAY;
     }
   }
 

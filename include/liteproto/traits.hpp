@@ -16,6 +16,26 @@
 
 namespace liteproto {
 
+// Thees are four data structures abstraction that supported by liteproto: list, map, string, array.
+
+// A list is a flexible-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
+// operator[]), but no random accessible required. A list also supports push_back and pop_back, and inserts a
+// new element to arbitrary position.
+// A list also supports size(), empty(), and clear().
+
+// A map is an key-value pairs collection. Each key must be unique in a map, and the value can be looked up via the
+// corresponding key. A map uses get() to look up and update() to modify. A map also supports size(), empty(), and
+// clear().
+
+// A string is almost the same as a list, except it doesn't be regarded as a container_type. A string is represented
+// by a single value, like "123" or "abc". Since the String is not a container_type, the underlying type cannot be
+// further inspected. A string supports all the operators that list supports.
+
+// An array is a fixed-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
+// operator[]). It doesn't support any other way to look up or modify. An array also supports size().
+
+enum class Kind : int8_t { SCALAR, POINTER, MESSAGE, LIST, MAP, STRING, ARRAY, PAIR, OTHER };
+
 namespace details {
 template <class C,
           class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::size), const C>, size_t>>>
@@ -23,6 +43,15 @@ auto HasSize(int) -> std::true_type;
 
 template <class>
 auto HasSize(float) -> std::false_type;
+
+template <class C, size_t = std::tuple_size<C>::value>
+auto HasConstexprSize(int) -> std::true_type;
+
+template <class C, class = std::enable_if_t<std::is_array_v<C>>>
+auto HasConstexprSize(int) -> std::true_type;
+
+template <class>
+auto HasConstexprSize(float) -> std::false_type;
 
 template <class C, class V, class = decltype(std::declval<C&>().resize(std::declval<size_t>())),
           class = decltype(std::declval<C&>().resize(std::declval<size_t>(), std::declval<V>()))>
@@ -76,6 +105,14 @@ auto HasAppend(int) -> std::true_type;
 
 template <class, class>
 auto HasAppend(float) -> std::false_type;
+
+template <class C, class V,
+          class = std::enable_if_t<std::is_same_v<V*, decltype(std::declval<C&>().data())> &&
+                                   std::is_same_v<const V*, decltype(std::declval<const C&>().data())>>>
+auto HasData(int) -> std::true_type;
+
+template <class C, class V>
+auto HasData(float) -> std::false_type;
 
 template <class It, class = std::enable_if_t<std::is_base_of_v<std::forward_iterator_tag,
                                                                typename std::iterator_traits<It>::iterator_category>>>
@@ -150,6 +187,12 @@ struct has_size : decltype(details::HasSize<C>(0)) {};
 
 template <class C>
 inline constexpr bool has_size_v = has_size<C>::value;
+
+template <class C>
+struct has_constexpr_size : decltype(details::HasConstexprSize<C>(0)) {};
+
+template <class C>
+inline constexpr bool has_constexpr_size_v = has_constexpr_size<C>::value;
 
 template <class C, class V>
 struct has_resize : decltype(details::HasReSize<C, V>(0)) {};
@@ -229,6 +272,12 @@ struct has_subscript : decltype(details::HasSubscript<C, Tp>(0)) {};
 template <class C, class Tp>
 inline constexpr bool has_subscript_v = has_subscript<C, Tp>::value;
 
+template <class C, class Tp>
+struct has_data : decltype(details::HasData<C, Tp>(0)) {};
+
+template <class C, class Tp>
+inline constexpr bool has_data_v = has_data<C, Tp>::value;
+
 // For the traits of our own types, we use camel case instead of underscore case.
 
 namespace internal {
@@ -239,39 +288,52 @@ inline constexpr bool is_list =
     has_clear_v<C> && is_forward_iterable_v<C> && has_insert_v<C, V> && has_erase_v<C>;
 
 template <class Str, class Char>
-inline constexpr bool is_string = is_list<Str, Char> && has_c_str_v<Str, Char> && has_append_v<Str, Char>;
+inline constexpr bool is_string =
+    is_list<Str, Char> && has_c_str_v<Str, Char> && has_append_v<Str, Char> && has_data_v<Str, char>;
+
+template <class C, class V>
+inline constexpr bool is_array = std::is_array_v<C> || (has_subscript_v<C, V> && has_constexpr_size_v<C> &&
+                                                        has_data_v<C, V> && is_forward_iterable_v<C>);
+
+// template <class C>
 
 }  // namespace internal
+
+// template <class Tp>
+// struct EnforcedKind;
+
+// using NonTempVector = void;
+//
+// template <>
+// struct EnforcedKind<NonTempVector> {
+//   static constexpr Kind kind = Kind::LIST;
+//   using value_type = void;
+// };
+
+template <class Tp, class Cond = void>
+struct ListTraits {};
+
+template <template <class...> class C, class V, class... Tps>
+struct ListTraits<C<V, Tps...>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
+  using container_type = C<V, Tps...>;
+  using value_type = V;
+};
+
+template <template <class...> class C, class V, class... Tps>
+struct ListTraits<const C<V, Tps...>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
+  using container_type = const C<V, Tps...>;
+  using value_type = V;
+};
 
 template <class Tp, class Cond = void>
 struct IsList : std::false_type {};
 
-template <template <class...> class C, class V>
-struct IsList<C<V>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
-  using container_type = C<V>;
-  using value_type = V;
-};
-
-template <template <class...> class C, class V>
-struct IsList<const C<V>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
-  using container_type = const C<V>;
-  using value_type = V;
-};
+template <class Tp>
+struct IsList<Tp, std::void_t<typename ListTraits<Tp>::container_type, typename ListTraits<Tp>::value_type>>
+    : std::true_type {};
 
 template <class Tp>
 inline constexpr bool IsListV = IsList<Tp>::value;
-
-template <class Tp, class = std::bool_constant<IsListV<std::remove_reference_t<Tp>>>>
-struct ListTraits;
-
-template <class Tp>
-struct ListTraits<Tp, std::false_type> {};
-
-template <class Tp>
-struct ListTraits<Tp, std::true_type> {
-  using container_type = typename IsList<std::remove_reference_t<Tp>>::container_type;
-  using value_type = typename IsList<std::remove_reference_t<Tp>>::value_type;
-};
 
 template <class Str>
 struct IsString : std::bool_constant<internal::is_string<Str, char>> {};
@@ -281,6 +343,47 @@ struct IsString<const Str> : std::bool_constant<internal::is_string<Str, char>> 
 
 template <class Str>
 inline constexpr bool IsStringV = IsString<Str>::value;
+
+template <class Tp, class Cond = void>
+struct ArrayTraits : std::false_type {};
+
+template <template <class, size_t> class C, class V, size_t N>
+struct ArrayTraits<C<V, N>, std::enable_if_t<internal::is_array<C<V, N>, V>>> : std::true_type {
+  using container_type = C<V, N>;
+  using value_type = V;
+  static constexpr size_t size = N;
+};
+
+template <class Tp, size_t N>
+struct ArrayTraits<Tp[N]> : std::true_type {
+  using container_type = Tp[N];
+  using value_type = Tp;
+  static constexpr size_t size = N;
+};
+
+template <template <class, size_t> class C, class V, size_t N>
+struct ArrayTraits<const C<V, N>, std::enable_if_t<internal::is_array<C<V, N>, V>>> : std::true_type {
+  using container_type = const C<V, N>;
+  using value_type = V;
+  static constexpr size_t size = N;
+};
+
+template <class Tp, size_t N>
+struct ArrayTraits<const Tp[N]> : std::true_type {
+  using container_type = const Tp[N];
+  using value_type = Tp;
+  static constexpr size_t size = N;
+};
+
+template <class Tp, class Cond = void>
+struct IsArray : std::false_type {};
+
+template <class Tp>
+struct IsArray<Tp, std::void_t<typename ArrayTraits<Tp>::container_type, typename ArrayTraits<Tp>::value_type>>
+    : std::true_type {};
+
+template <class Tp>
+inline constexpr bool IsArrayV = IsArray<Tp>::value;
 
 template <class Pair>
 struct IsPair : decltype(details::IsPair<Pair>(0)) {};
@@ -315,15 +418,20 @@ static_assert(has_c_str_v<std::string, char>);
 static_assert(has_append_v<std::string, char>);
 static_assert(IsStringV<std::string>);
 static_assert(IsStringV<const std::string>);
+static_assert(IsListV<std::vector<int>>);
+static_assert(IsListV<const std::vector<int>>);
 static_assert(has_subscript_v<std::vector<int>, int>);
 
 static_assert(has_subscript_v<int[1][2][3], int[2][3]>);
+static_assert(IsArrayV<int[1][2][3]>);
 
-static_assert(std::is_same_v<std::vector<int>, typename ListTraits<std::vector<int>&&>::container_type>);
-static_assert(std::is_same_v<int, typename ListTraits<std::vector<int>&&>::value_type>);
+static_assert(internal::is_array<std::array<int, 6>, int>);
+static_assert(IsArrayV<std::array<int, 6>>);
 
-static_assert(std::is_same_v<const std::deque<int>, typename ListTraits<const std::deque<int>&>::container_type>);
-static_assert(std::is_same_v<int, typename ListTraits<const std::vector<int>&&>::value_type>);
+static_assert(!IsListV<std::vector<int>&&>);
+static_assert(IsListV<std::vector<int>>);
+static_assert(!IsListV<const std::deque<int>&>);
+static_assert(IsListV<const std::deque<int>>);
 
 static_assert(is_forward_iterator_v<std::list<int>::iterator>);
 static_assert(!is_forward_iterator_v<std::list<int>>);
@@ -345,6 +453,10 @@ static_assert(has_erase_v<std::map<int, std::string>>);
 static_assert(!has_erase_v<std::array<int, 1>>);
 
 static_assert(has_insert_v<std::vector<int>, int>);
+
+static_assert(has_constexpr_size_v<int[2][3][4]>);
+static_assert(has_constexpr_size_v<std::array<int, 5>>);
+static_assert(!has_constexpr_size_v<std::vector<int>>);
 
 }  // namespace internal_test
 
