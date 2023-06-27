@@ -13,6 +13,8 @@ namespace liteproto {
 template <class Tp>
 class ListIterator;
 
+namespace internal {
+
 template <class Tp>
 struct ListInterface {
   using iterator = ListIterator<Tp>;
@@ -23,6 +25,8 @@ struct ListInterface {
   using erase_t = void(std::any&, std::size_t);
   using operator_subscript_t = Tp&(std::any&, std::size_t);
   using size_t = std::size_t(const std::any&);
+  using resize_t = void(std::any&, std::size_t);
+  using resize_append_t = void(std::any&, std::size_t, const Tp&);
   using empty_t = bool(const std::any&);
   using clear_t = void(std::any&);
   using begin_t = iterator(std::any&);
@@ -34,16 +38,33 @@ struct ListInterface {
   erase_t* erase;
   operator_subscript_t* operator_subscript;
   size_t* size;
+  resize_t* resize;
+  resize_append_t* resize_append;
   empty_t* empty;
   clear_t* clear;
   begin_t* begin;
   end_t* end;
 };
 
-namespace internal {
+struct StringInterface : ListInterface<char> {
+  using c_str_t = const char*(const std::any&);
+  using append_t = void(std::any&, const char*, std::size_t);
 
-template <class Tp, class List>
-struct ListInterfaceImpl : ListInterface<Tp> {
+  c_str_t* c_str;
+  append_t* append;
+};
+
+template <class Car, class Cdr>
+struct PairInterface {
+  using car_t = Car&();
+  using cdr_t = Cdr&();
+
+  car_t* car;
+  cdr_t* cdr;
+};
+
+template <class List, class Tp>
+struct ListInterfaceImpl {
   using base = ListInterface<Tp>;
   using iterator = typename ListInterface<Tp>::iterator;
 
@@ -83,6 +104,18 @@ struct ListInterfaceImpl : ListInterface<Tp> {
   }
   static_assert(std::is_same_v<decltype(size), typename base::size_t>);
 
+  static void resize(std::any& obj, size_t count) {
+    auto* ptr = std::any_cast<List>(&obj);
+    (*ptr).resize(count);
+  }
+  static_assert(std::is_same_v<decltype(resize), typename base::resize_t>);
+
+  static void resize_append(std::any& obj, size_t count, const Tp& v) {
+    auto* ptr = std::any_cast<List>(&obj);
+    (*ptr).resize(count, v);
+  }
+  static_assert(std::is_same_v<decltype(resize_append), typename base::resize_append_t>);
+
   static bool empty(const std::any& obj) {
     auto* ptr = std::any_cast<List>(&obj);
     return (*ptr).empty();
@@ -108,12 +141,27 @@ struct ListInterfaceImpl : ListInterface<Tp> {
   static_assert(std::is_same_v<decltype(end), typename base::end_t>);
 };
 
-}  // namespace internal
+template <class Str>
+struct StringInterfaceImpl : ListInterfaceImpl<Str, char> {
+  using base = StringInterface;
+
+  static const char* c_str(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Str>(&obj);
+    return (*ptr).c_str();
+  }
+  static_assert(std::is_same_v<decltype(c_str), typename base::c_str_t>);
+
+  static void append(std::any& obj, const char* cstr, size_t n) {
+    auto* ptr = std::any_cast<Str>(&obj);
+    return (*ptr).append(cstr, n);
+  }
+  static_assert(std::is_same_v<decltype(append), typename base::append_t>);
+};
 
 template <class Adapter>
 auto MakeListInterface() {
   using iterator_value_type = typename Adapter::iterator_value_type;
-  using impl = internal::ListInterfaceImpl<iterator_value_type, Adapter>;
+  using impl = ListInterfaceImpl<Adapter, iterator_value_type>;
   ListInterface<iterator_value_type> interface {};
   interface.push_back = &impl::push_back;
   interface.pop_back = &impl::pop_back;
@@ -121,11 +169,37 @@ auto MakeListInterface() {
   interface.erase = &impl::erase;
   interface.operator_subscript = &impl::operator_subscript;
   interface.size = &impl::size;
+  interface.resize = &impl ::resize;
+  interface.resize_append = &impl ::resize_append;
   interface.empty = &impl::empty;
   interface.clear = &impl::clear;
   interface.begin = &impl::begin;
   interface.end = &impl::end;
   return interface;
 }
+
+template <class Adapter>
+auto MakeStringInterface() {
+  using impl = StringInterfaceImpl<Adapter>;
+  StringInterface interface {};
+  interface.push_back = &impl::push_back;
+  interface.pop_back = &impl::pop_back;
+  interface.insert = &impl::insert;
+  interface.erase = &impl::erase;
+  interface.operator_subscript = &impl::operator_subscript;
+  interface.size = &impl::size;
+  interface.resize = &impl ::resize;
+  interface.resize_append = &impl ::resize_append;
+  interface.empty = &impl::empty;
+  interface.clear = &impl::clear;
+  interface.begin = &impl::begin;
+  interface.end = &impl::end;
+
+  interface.c_str = &impl::c_str;
+  interface.append = &impl::append;
+  return interface;
+}
+
+}  // namespace internal
 
 }  // namespace liteproto

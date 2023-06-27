@@ -4,6 +4,7 @@ project(liteproto)
 set(CMAKE_CXX_STANDARD 17)
 
 list(APPEND liteproto_headers
+        include/liteproto/liteproto.hpp
         include/liteproto/message.hpp
         include/liteproto/utils.hpp
         include/liteproto/reflect/type.hpp

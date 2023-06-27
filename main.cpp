@@ -1,9 +1,10 @@
+#include <cassert>
 #include <iostream>
 #include <map>
 #include <tuple>
 #include <type_traits>
 
-#include "liteproto/message.hpp"
+#include "liteproto/liteproto.hpp"
 
 #define FIELD_X(name)                                                                    \
   name##_;                                                                               \
@@ -34,6 +35,8 @@ MESSAGE(TestMessage) {
 
   constexpr TestMessage(int v1, double v2, float v3) : test_field_(v1), test_field2_(v2), test_field3_(v3) {}
 };
+
+#include <functional>
 
 int main() {
   using namespace liteproto;
@@ -70,6 +73,12 @@ int main() {
   for (auto& v : list) {
     std::cout << v << ' ';
   }
+  std::cout << std::endl;
+  list.resize(10, "abc");
+  for (auto& v : anol) {
+    std::cout << v <<  ' ';
+  }
+  std::cout << std::endl;
 
   TestMessage msg{1, 2.5, 3.33};
   auto dumped = msg.DumpTuple();

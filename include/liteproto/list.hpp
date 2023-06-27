@@ -4,8 +4,9 @@
 
 #pragma once
 
+#include <memory>
+
 #include "liteproto/interface.hpp"
-#include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
 
 namespace liteproto {
@@ -30,6 +31,9 @@ class List<Tp, ConstOption::NON_CONST> {
 
   decltype(auto) operator[](size_t pos) const { return interface_.operator_subscript(obj_, pos); }
 
+  void resize(size_t count) const { return interface_.resize(obj_, count); }
+  void resize(size_t count, const Tp& v) { return interface_.resize_append(obj_, count, v); }
+
   size_t size() const { return interface_.size(obj_); }
   bool empty() const { return interface_.empty(obj_); }
   void clear() const { return interface_.clear(obj_); }
@@ -42,9 +46,12 @@ class List<Tp, ConstOption::NON_CONST> {
 
  private:
   template <class Adapter>
-  List(Adapter&& adapter, ListInterface<Tp> interface) : obj_(std::forward<Adapter>(adapter)), interface_(interface) {}
+  List(Adapter&& adapter, internal::ListInterface<Tp> interface)
+      : obj_(std::forward<Adapter>(adapter)), interface_(interface) {
+    static_assert(std::is_nothrow_move_constructible_v<List>);
+  }
 
-  ListInterface<Tp> interface_;
+  internal::ListInterface<Tp> interface_;
   mutable std::any obj_;
 };
 
@@ -66,10 +73,10 @@ class List<Tp, ConstOption::CONST> {
 
  private:
   template <class Adapter>
-  List(Adapter&& adapter, ListInterface<const Tp> interface)
+  List(Adapter&& adapter, internal::ListInterface<const Tp> interface)
       : obj_(std::forward<Adapter>(adapter)), interface_(interface) {}
 
-  ListInterface<const Tp> interface_;
+  internal::ListInterface<const Tp> interface_;
   mutable std::any obj_;
 };
 
@@ -191,8 +198,9 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
  public:
   explicit ListAdapter(container_type* c) : container_(c) {
-    static_assert(std::is_copy_constructible<ListAdapter>::value);
-    static_assert(std::is_copy_assignable<ListAdapter>::value);
+    static_assert(std::is_copy_constructible_v<ListAdapter>);
+    static_assert(std::is_copy_assignable_v<ListAdapter>);
+    static_assert(std::is_nothrow_move_constructible_v<ListAdapter>);
   }
 
   void push_back(value_type v) const {
@@ -236,6 +244,19 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
     return *it;
   }
 
+  void resize(size_t count) const {
+    // If the container is const, do nothing. And it's assured that this method will never be called.
+    if constexpr (!std::is_const_v<container_type>) {
+      container_->resize(count);
+    }
+  }
+  void resize(size_t count, const value_type& v) const {
+    // If the container is const, do nothing. And it's assured that this method will never be called.
+    if constexpr (!std::is_const_v<container_type>) {
+      container_->resize(count, v);
+    }
+  }
+
   size_t size() const noexcept { return container_->size(); }
   bool empty() const noexcept { return container_->empty(); }
   void clear() const {
@@ -267,7 +288,7 @@ auto MakeList(C&& container) {
   ListAdapter<ref_removed> adapter{&container};
   using value_type = typename ListAdapter<ref_removed>::value_type;
   constexpr auto const_opt = static_cast<ConstOption>(std::is_const_v<ref_removed>);
-  List<value_type, const_opt> list{std::move(adapter), MakeListInterface<decltype(adapter)>()};
+  List<value_type, const_opt> list{std::move(adapter), internal::MakeListInterface<decltype(adapter)>()};
   return list;
 }
 

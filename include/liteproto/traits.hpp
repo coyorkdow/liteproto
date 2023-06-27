@@ -24,6 +24,13 @@ auto HasSize(int) -> std::true_type;
 template <class>
 auto HasSize(float) -> std::false_type;
 
+template <class C, class V, class = decltype(std::declval<C&>().resize(std::declval<size_t>())),
+          class = decltype(std::declval<C&>().resize(std::declval<size_t>(), std::declval<V>()))>
+auto HasReSize(int) -> std::true_type;
+
+template <class, class>
+auto HasReSize(float) -> std::false_type;
+
 template <class C, class = std::enable_if_t<
                        std::is_convertible_v<std::invoke_result_t<decltype(&C::capacity), const C>, size_t>>>
 auto HasCapacity(int) -> std::true_type;
@@ -44,10 +51,10 @@ auto HasClear(int) -> std::true_type;
 template <class>
 auto HasClear(float) -> std::false_type;
 
-template <template <class...> class C, class Tp, class = decltype(std::declval<C<Tp>&>().push_back(std::declval<Tp>()))>
+template <class C, class V, class = decltype(std::declval<C&>().push_back(std::declval<V>()))>
 auto HasPushBack(int) -> std::true_type;
 
-template <template <class...> class, class>
+template <class, class>
 auto HasPushBack(float) -> std::false_type;
 
 template <class C, class = std::invoke_result_t<decltype(&C::pop_back), C>>
@@ -55,6 +62,20 @@ auto HasPopBack(int) -> std::true_type;
 
 template <class>
 auto HasPopBack(float) -> std::false_type;
+
+template <class C, class Char,
+          class = std::enable_if_t<std::is_same_v<const Char*, std::invoke_result_t<decltype(&C::c_str), const C>>>>
+auto HasCStr(int) -> std::true_type;
+
+template <class, class>
+auto HasCStr(float) -> std::false_type;
+
+template <class C, class Char,
+          class = decltype(std::declval<C>().append(std::declval<const Char*>(), std::declval<size_t>()))>
+auto HasAppend(int) -> std::true_type;
+
+template <class, class>
+auto HasAppend(float) -> std::false_type;
 
 template <class It, class = std::enable_if_t<std::is_base_of_v<std::forward_iterator_tag,
                                                                typename std::iterator_traits<It>::iterator_category>>>
@@ -80,12 +101,27 @@ auto HasErase(int) -> std::true_type;
 template <class>
 auto HasErase(float) -> std::false_type;
 
-template <template <class...> class C, class Tp, class It = decltype(begin(std::declval<C<Tp>&>())),
-          class = decltype(std::declval<C<Tp>&>().insert(std::declval<It>(), std::declval<Tp>()))>
+template <class C, class V, class It = decltype(begin(std::declval<C&>())),
+          class = decltype(std::declval<C&>().insert(std::declval<It>(), std::declval<V>()))>
 auto HasInsert(int) -> std::true_type;
 
-template <template <class...> class, class>
+template <class, class>
 auto HasInsert(float) -> std::false_type;
+
+template <class C, class V,
+          class = std::enable_if_t<
+              std::is_convertible_v<decltype(std::declval<C&>()[std::declval<size_t>()]), V&> &&
+              std::is_convertible_v<decltype(std::declval<const C&>()[std::declval<size_t>()]), const V&>>>
+auto HasSubscript(int) -> std::true_type;
+
+template <class, class>
+auto HasSubscript(float) -> std::false_type;
+
+template <class C, class = std::void_t<decltype(std::declval<C&>().first), decltype(std::declval<C&>().second)>>
+auto IsPair(int) -> std::true_type;
+
+template <class C>
+auto IsPair(float) -> std::false_type;
 
 }  // namespace details
 
@@ -115,6 +151,12 @@ struct has_size : decltype(details::HasSize<C>(0)) {};
 template <class C>
 inline constexpr bool has_size_v = has_size<C>::value;
 
+template <class C, class V>
+struct has_resize : decltype(details::HasReSize<C, V>(0)) {};
+
+template <class C, class V>
+inline constexpr bool has_resize_v = has_resize<C, V>::value;
+
 template <class C>
 struct has_capacity : decltype(details::HasCapacity<C>(0)) {};
 
@@ -133,10 +175,10 @@ struct has_clear : decltype(details::HasClear<C>(0)) {};
 template <class C>
 inline constexpr bool has_clear_v = has_clear<C>::value;
 
-template <template <class...> class C, class Tp>
+template <class C, class Tp>
 struct has_push_back : decltype(details::HasPushBack<C, Tp>(0)) {};
 
-template <template <class...> class C, class Tp>
+template <class C, class Tp>
 inline constexpr bool has_push_back_v = has_push_back<C, Tp>::value;
 
 template <class C>
@@ -163,30 +205,55 @@ struct has_erase : decltype(details::HasErase<C>(0)) {};
 template <class C>
 inline constexpr bool has_erase_v = has_erase<C>::value;
 
-template <template <class...> class C, class Tp>
+template <class C, class Tp>
 struct has_insert : decltype(details::HasInsert<C, Tp>(0)) {};
 
-template <template <class...> class C, class Tp>
+template <class C, class Tp>
 inline constexpr bool has_insert_v = has_insert<C, Tp>::value;
 
+template <class C, class Char>
+struct has_c_str : decltype(details::HasCStr<C, Char>(0)) {};
+
+template <class C, class Char>
+inline constexpr bool has_c_str_v = has_c_str<C, Char>::value;
+
+template <class C, class Char>
+struct has_append : decltype(details::HasAppend<C, Char>(0)) {};
+
+template <class C, class Char>
+inline constexpr bool has_append_v = has_append<C, Char>::value;
+
+template <class C, class Tp>
+struct has_subscript : decltype(details::HasSubscript<C, Tp>(0)) {};
+
+template <class C, class Tp>
+inline constexpr bool has_subscript_v = has_subscript<C, Tp>::value;
+
 // For the traits of our own types, we use camel case instead of underscore case.
+
+namespace internal {
+
+template <class C, class V>
+inline constexpr bool is_list =
+    has_push_back_v<C, V> && has_pop_back_v<C> && has_size_v<C> && has_resize_v<C, V> && has_empty_v<C> &&
+    has_clear_v<C> && is_forward_iterable_v<C> && has_insert_v<C, V> && has_erase_v<C>;
+
+template <class Str, class Char>
+inline constexpr bool is_string = is_list<Str, Char> && has_c_str_v<Str, Char> && has_append_v<Str, Char>;
+
+}  // namespace internal
 
 template <class Tp, class Cond = void>
 struct IsList : std::false_type {};
 
 template <template <class...> class C, class V>
-struct IsList<
-    C<V>, std::enable_if_t<has_push_back_v<C, V> && has_pop_back_v<C<V>> && has_size_v<C<V>> && has_empty_v<C<V>> &&
-                           has_clear_v<C<V>> && is_forward_iterable_v<C<V>> && has_insert_v<C, V> && has_erase_v<C<V>>>>
-    : std::true_type {
+struct IsList<C<V>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
   using container_type = C<V>;
   using value_type = V;
 };
 
 template <template <class...> class C, class V>
-struct IsList<const C<V>, std::enable_if_t<has_push_back_v<C, V> && has_pop_back_v<C<V>> && has_size_v<C<V>> &&
-                                           has_empty_v<C<V>> && has_clear_v<C<V>> && is_forward_iterable_v<C<V>> &&
-                                           has_insert_v<C, V> && has_erase_v<C<V>>>> : std::true_type {
+struct IsList<const C<V>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
   using container_type = const C<V>;
   using value_type = V;
 };
@@ -206,7 +273,51 @@ struct ListTraits<Tp, std::true_type> {
   using value_type = typename IsList<std::remove_reference_t<Tp>>::value_type;
 };
 
+template <class Str>
+struct IsString : std::bool_constant<internal::is_string<Str, char>> {};
+
+template <class Str>
+struct IsString<const Str> : std::bool_constant<internal::is_string<Str, char>> {};
+
+template <class Str>
+inline constexpr bool IsStringV = IsString<Str>::value;
+
+template <class Pair>
+struct IsPair : decltype(details::IsPair<Pair>(0)) {};
+
+template <class Pair>
+struct IsPair<const Pair> : decltype(details::IsPair<Pair>(0)) {};
+
+template <class Pair>
+inline constexpr bool IsPairV = IsPair<Pair>::value;
+
+template <class Pair, class = std::bool_constant<IsPairV<std::remove_reference_t<Pair>>>>
+struct PairTraits;
+
+template <class Pair>
+struct PairTraits<Pair, std::false_type> {};
+
+template <class Pair>
+struct PairTraits<Pair, std::true_type> {
+  using first = decltype(std::declval<Pair&>().first);
+  using second = decltype(std::declval<Pair&>().second);
+};
+
 namespace internal_test {
+
+static_assert(IsPairV<std::pair<int, IsPair<void>>>);
+static_assert(!IsPairV<void>);
+using p = std::pair<int, IsPair<void>>;
+static_assert(std::is_same_v<typename PairTraits<p>::first, int>);
+static_assert(std::is_same_v<typename PairTraits<p>::second, IsPair<void>>);
+
+static_assert(has_c_str_v<std::string, char>);
+static_assert(has_append_v<std::string, char>);
+static_assert(IsStringV<std::string>);
+static_assert(IsStringV<const std::string>);
+static_assert(has_subscript_v<std::vector<int>, int>);
+
+static_assert(has_subscript_v<int[1][2][3], int[2][3]>);
 
 static_assert(std::is_same_v<std::vector<int>, typename ListTraits<std::vector<int>&&>::container_type>);
 static_assert(std::is_same_v<int, typename ListTraits<std::vector<int>&&>::value_type>);
@@ -223,8 +334,8 @@ static_assert(has_empty_v<std::vector<int>>);
 static_assert(has_clear_v<std::vector<int>>);
 static_assert(has_capacity_v<const std::vector<int>>);
 
-static_assert(has_push_back_v<std::vector, int>);
-static_assert(!has_push_back_v<std::queue, int>);
+static_assert(has_push_back_v<std::vector<int>, int>);
+static_assert(!has_push_back_v<std::queue<int>, int>);
 
 static_assert(has_pop_back_v<std::vector<int>>);
 static_assert(!has_pop_back_v<std::queue<int>>);
@@ -233,7 +344,7 @@ static_assert(has_erase_v<std::vector<int>>);
 static_assert(has_erase_v<std::map<int, std::string>>);
 static_assert(!has_erase_v<std::array<int, 1>>);
 
-static_assert(has_insert_v<std::vector, int>);
+static_assert(has_insert_v<std::vector<int>, int>);
 
 }  // namespace internal_test
 
