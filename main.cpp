@@ -9,7 +9,7 @@
 void test() {
   using namespace liteproto;
   std::vector<std::string> strlist;
-  auto list = AsList(strlist);
+  auto list = AsList(&strlist);
   for (int i = 0; i < 10; i++) {
     list.push_back(std::to_string(i));
   }
@@ -26,7 +26,7 @@ void test() {
   }
   std::cout << std::endl;
   const auto& cref = strlist;
-  auto const_list = AsList(cref);
+  auto const_list = AsList(&cref);
   for (int i = 0; i < const_list.size(); i++) {
     assert(const_list[i].back() == 'x');
   }
@@ -38,7 +38,7 @@ void test() {
   Iterator<std::string> it = list.begin();
 
   std::list<std::string> anol;
-  list = AsList(anol);
+  list = AsList(&anol);
   assert(it != list.begin());
   assert(list.size() == 0);
   for (int i = 0; i < 5; i++) {
@@ -66,7 +66,7 @@ void test() {
 
 template <class T1, class T2, class T3>
 TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
-  T1 FIELD(test_field) -> Seq<1>;
+  T1 FIELD(test_field)  -> Seq<1>;
   T2 FIELD(test_field2) -> Seq<2>;
   T3 FIELD(test_field3) -> Seq<3>;
 

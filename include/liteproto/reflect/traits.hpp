@@ -57,4 +57,7 @@ struct IsImmediateType<Tp&> : IsImmediateType<Tp> {};
 template <class Tp>
 struct IsImmediateType<Tp&&> : IsImmediateType<Tp> {};
 
+template <class Tp>
+inline constexpr bool IsImmediateTypeV = IsImmediateType<Tp>::value;
+
 }  // namespace liteproto

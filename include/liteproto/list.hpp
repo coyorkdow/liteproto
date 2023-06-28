@@ -8,6 +8,7 @@
 
 #include "liteproto/interface.hpp"
 #include "liteproto/iterator.hpp"
+#include "liteproto/reflect/traits.hpp"
 #include "liteproto/reflect/type.hpp"
 
 namespace liteproto {
@@ -18,7 +19,7 @@ class List;
 template <class Tp>
 class List<Tp, ConstOption::NON_CONST> {
   template <class C, class>
-  friend auto AsList(C&& container);
+  friend auto AsList(C* container);
 
   friend class List<Tp, ConstOption::CONST>;
 
@@ -65,7 +66,7 @@ class List<Tp, ConstOption::NON_CONST> {
 template <class Tp>
 class List<Tp, ConstOption::CONST> {
   template <class C, class>
-  friend auto AsList(C&& container);
+  friend auto AsList(C* container);
 
  public:
   decltype(auto) operator[](size_t pos) const { return interface_.operator_subscript(obj_, pos); }
@@ -110,7 +111,7 @@ class List<Tp, ConstOption::CONST> {
 namespace internal {
 
 template <class Tp>
-class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
+class ListAdapter<Tp, std::enable_if_t<IsListV<Tp> && IsImmediateTypeV<typename ListTraits<Tp>::value_type>>> {
   static_assert(!std::is_reference_v<Tp>);
   using list_traits = ListTraits<Tp>;
 
@@ -211,15 +212,14 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
 }  // namespace internal
 
-template <class C, class = internal::ListAdapter<std::remove_reference_t<C>>>
-auto AsList(C&& container) {
-  using ref_removed = std::remove_reference_t<C>;
-  internal::ListAdapter<ref_removed> adapter{&container};
+template <class C, class = internal::ListAdapter<C>>
+auto AsList(C* container) {
+  internal::ListAdapter<C> adapter{container};
 
   static_assert(std::is_trivially_copyable_v<decltype(adapter)>);
 
-  using value_type = typename internal::ListAdapter<ref_removed>::value_type;
-  constexpr auto const_opt = static_cast<ConstOption>(std::is_const_v<ref_removed>);
+  using value_type = typename internal::ListAdapter<C>::value_type;
+  constexpr auto const_opt = static_cast<ConstOption>(std::is_const_v<C>);
   List<value_type, const_opt> list{adapter, internal::MakeListInterface<decltype(adapter)>()};
   return list;
 }
