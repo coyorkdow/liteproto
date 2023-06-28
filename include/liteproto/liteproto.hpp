@@ -8,14 +8,11 @@
 #include "pair.hpp"
 #include "reflect.hpp"
 
-#define MESSAGE_DEF_HELPER(msg_name)                  \
-  struct MessageDefHelper_##msg_name {                \
-    static constexpr int32_t FIELDS_start = __LINE__; \
-  };
+#define MESSAGE(msg_name) class msg_name : public liteproto::MessageBase<msg_name, __LINE__>
 
-#define MESSAGE(msg_name)      \
-  MESSAGE_DEF_HELPER(msg_name) \
-  class msg_name : public liteproto::MessageBase<msg_name>, public MessageDefHelper_##msg_name
+#define $(...) __VA_ARGS__
+
+#define TEMPLATE_MESSAGE(msg_name, arg) class msg_name : public liteproto::MessageBase<msg_name<arg>, __LINE__>
 
 #if defined(__clang__) && !defined(LITE_PROTO_COMPATIBLE_MODE_)
 #define FIELD(name)                                                                                     \

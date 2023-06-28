@@ -15,7 +15,7 @@
 
 namespace liteproto {
 
-template <class Msg>
+template <class Msg, int32_t Line>
 class MessageBase {
  public:
   template <size_t I = 0, size_t N>
@@ -33,6 +33,8 @@ class MessageBase {
   [[nodiscard]] constexpr auto DumpTuple() const {
     return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{});
   }
+
+  static constexpr int32_t FIELDS_start = Line;
 
   struct FieldsIndices {
 #if defined(__clang__) && !defined(LITE_PROTO_COMPATIBLE_MODE_)

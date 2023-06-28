@@ -6,34 +6,13 @@
 
 #include "liteproto/liteproto.hpp"
 
-#define FIELD_X(name)                                                                    \
-  name##_;                                                                               \
-                                                                                         \
- public:                                                                                 \
-  const decltype(name##_)& name() const { return name##_; }                              \
-  decltype(name##_)& mutable_##name() { return name##_; }                                \
-  void set_##name(decltype(name##_) v) { name##_ = std::move(v); }                       \
-  static constexpr decltype(auto) FIELD_name(int32_constant<__LINE__>) { return #name; } \
-  auto FIELD_type(int32_constant<__LINE__>)->decltype(test_field_);                      \
-  decltype(name##_)& FIELD_value(int32_constant<__LINE__>) { return name##_; }           \
-  static auto FIELD_seq(int32_constant<__LINE__>)
+template <class T1, class T2, class T3>
+TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
+  T1 FIELD(test_field)  -> Seq<1>;
+  T2 FIELD(test_field2) -> Seq<2>;
+  T3 FIELD(test_field3) -> Seq<3>;
 
-// template <class Msg>
-// class MessageBasic2 {
-//  public:
-//   static constexpr auto GetAllFields() { return ::GetAllFields2<Msg>(); }
-//
-//   static constexpr int32_t FIELDS_start = __LINE__;
-// };
-//
-// #define MESSAGE2(name) class name : public MessageBasic2<name>
-
-MESSAGE(TestMessage) {
-  int FIELD(test_field)->Seq<1>;
-  double FIELD(test_field2)->Seq<2>;
-  float FIELD(test_field3)->Seq<3>;
-
-  constexpr TestMessage(int v1, double v2, float v3) : test_field_(v1), test_field2_(v2), test_field3_(v3) {}
+  constexpr TestMessage(T1 v1, T2 v2, T3 v3) : test_field_(v1), test_field2_(v2), test_field3_(v3) {}
 };
 
 #include <functional>
@@ -96,7 +75,7 @@ int main() {
 
   std::cout << std::endl;
 
-  TestMessage msg{1, 2.5, 3.33};
+  TestMessage<int, float, double> msg{1, 2.5, 3.33};
   auto dumped = msg.DumpTuple();
   static_assert(std::tuple_size_v<decltype(dumped)> == 3);
   std::cout << std::get<0>(dumped) << ' ' << std::get<1>(dumped) << ' ' << std::get<2>(dumped) << std::endl;
