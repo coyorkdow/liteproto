@@ -20,7 +20,7 @@ class Pair<Car, Cdr, ConstOption::NON_CONST> {
 
  private:
   internal::PairInterface<Car, Cdr> interface_;
-  mutable std::any obj_;
+  std::any obj_;
 };
 
 template <class Car, class Cdr>
@@ -31,7 +31,7 @@ class Pair<Car, Cdr, ConstOption::CONST> {
 
  private:
   internal::PairInterface<const Car, const Cdr> interface_;
-  mutable std::any obj_;
+  std::any obj_;
 };
 
 }  // namespace liteproto

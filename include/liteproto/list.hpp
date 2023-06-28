@@ -59,7 +59,7 @@ class List<Tp, ConstOption::NON_CONST> {
   }
 
   internal::ListInterface<Tp> interface_;
-  mutable std::any obj_;
+  std::any obj_;
 };
 
 template <class Tp>
@@ -104,7 +104,7 @@ class List<Tp, ConstOption::CONST> {
       : obj_(std::forward<Adapter>(adapter)), interface_(interface) {}
 
   internal::ListInterface<const Tp> interface_;
-  mutable std::any obj_;
+  std::any obj_;
 };
 
 namespace internal {

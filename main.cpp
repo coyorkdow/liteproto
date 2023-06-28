@@ -6,20 +6,8 @@
 
 #include "liteproto/liteproto.hpp"
 
-template <class T1, class T2, class T3>
-TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
-  T1 FIELD(test_field)  -> Seq<1>;
-  T2 FIELD(test_field2) -> Seq<2>;
-  T3 FIELD(test_field3) -> Seq<3>;
-
-  constexpr TestMessage(T1 v1, T2 v2, T3 v3) : test_field_(v1), test_field2_(v2), test_field3_(v3) {}
-};
-
-#include <functional>
-
-int main() {
+void test() {
   using namespace liteproto;
-
   std::vector<std::string> strlist;
   auto list = AsList(strlist);
   for (int i = 0; i < 10; i++) {
@@ -74,17 +62,28 @@ int main() {
   std::cout << const_list.begin()->c_str();
 
   std::cout << std::endl;
+}
 
-  TestMessage<int, float, double> msg{1, 2.5, 3.33};
-  auto dumped = msg.DumpTuple();
-  static_assert(std::tuple_size_v<decltype(dumped)> == 3);
-  std::cout << std::get<0>(dumped) << ' ' << std::get<1>(dumped) << ' ' << std::get<2>(dumped) << std::endl;
+template <class T1, class T2, class T3>
+TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
+  T1 FIELD(test_field) -> Seq<1>;
+  T2 FIELD(test_field2) -> Seq<2>;
+  T3 FIELD(test_field3) -> Seq<3>;
 
-  msg.set_test_field(5);
-  msg.set_test_field2(msg.test_field2() + 1);
-  msg.set_test_field3(msg.test_field3() + 2);
-  dumped = msg.DumpTuple();
-  std::cout << std::get<0>(dumped) << ' ' << std::get<1>(dumped) << ' ' << std::get<2>(dumped) << std::endl;
+  constexpr TestMessage(T1 v1, T2 v2, T3 v3) : test_field_(std::move(v1)), test_field2_(std::move(v2)), test_field3_(std::move(v3)) {}
+};
 
+int main() {
+  using namespace liteproto;
+
+  TestMessage<int, float, std::string> msg{1, 2.5, "str"};
+  std::cout << msg.test_field() << ' ' << msg.test_field2() << ' ' << msg.test_field3() << '\n';
+  auto tuple_ref = msg.DumpForwardTuple();
+  std::get<0>(tuple_ref)++;
+  std::get<1>(tuple_ref)--;
+  std::get<2>(tuple_ref).append("str");
+  std::cout << msg.test_field() << ' ' << msg.test_field2() << ' ' << msg.test_field3() << '\n';
+
+  test();
   return 0;
 }

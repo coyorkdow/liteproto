@@ -30,8 +30,12 @@ class MessageBase {
     }
   }
 
-  [[nodiscard]] constexpr auto DumpTuple() const {
+  [[nodiscard]] auto DumpTuple() const {
     return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{});
+  }
+
+  [[nodiscard]] auto DumpForwardTuple() {
+    return DumpForwardTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{});
   }
 
   static constexpr int32_t FIELDS_start = Line;
@@ -48,9 +52,16 @@ class MessageBase {
  private:
   template <size_t... I>
   [[nodiscard]] constexpr auto DumpTupleImpl(std::index_sequence<I...>) const {
-    auto msg = static_cast<const Msg&>(*this);
+    auto& msg = static_cast<const Msg&>(*this);
     constexpr auto indices = FieldsIndices::value;
     return std::make_tuple(msg.FIELD_value(int32_constant<indices[I].second>{})...);
+  }
+
+  template <size_t... I>
+  [[nodiscard]] auto DumpForwardTupleImpl(std::index_sequence<I...>) {
+    auto& msg = static_cast<Msg&>(*this);
+    constexpr auto indices = FieldsIndices::value;
+    return std::forward_as_tuple(msg.FIELD_value(int32_constant<indices[I].second>{})...);
   }
 };
 
