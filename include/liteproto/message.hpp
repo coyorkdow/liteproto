@@ -41,7 +41,7 @@ class MessageBase {
   static constexpr int32_t FIELDS_start = Line;
 
   struct FieldsIndices {
-#if defined(__clang__) && !defined(LITE_PROTO_COMPATIBLE_MODE_)
+#if defined(__clang__) && defined(LITE_PROTO_DISABLE_COMPATIBLE_MODE_)
     static constexpr auto value = GetAllFields<Msg>();
 // #elif defined(__GNUC__) || defined(__GNUG__)
 #else

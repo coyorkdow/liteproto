@@ -74,8 +74,6 @@ class IteratorBase {
     ++(*this);
     return old;
   }
-  bool operator==(const iterator& rhs) const noexcept { return !(*this != rhs); }
-  bool operator!=(const iterator& rhs) const noexcept { return interface_.noteq(it_, rhs); }
 
   [[nodiscard]] uint64_t AdapterTypeId() const noexcept { return interface_.adapter_type_id(it_); }
 
@@ -122,6 +120,8 @@ class Iterator : public IteratorBase<Tp> {
   Iterator& operator=(const Iterator&) noexcept = default;
   Iterator& operator=(Iterator&&) noexcept = default;
 
+  bool operator==(const Iterator& rhs) const noexcept { return !(*this != rhs); }
+  bool operator!=(const Iterator& rhs) const noexcept { return base::interface_.noteq(base::it_, rhs); }
   typename base::pointer operator->() noexcept { return base::interface_.member_of_object(base::it_); }
 
  private:
