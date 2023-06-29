@@ -5,6 +5,7 @@
 #pragma once
 
 #include "liteproto/traits.hpp"
+#include "liteproto/reflect.hpp"
 
 namespace liteproto::internal_test {
 
@@ -61,5 +62,43 @@ static_assert(has_insert_v<std::vector<int>, int>);
 static_assert(has_constexpr_size_v<int[2][3][4]>);
 static_assert(has_constexpr_size_v<std::array<int, 5>>);
 static_assert(!has_constexpr_size_v<std::vector<int>>);
+
+
+#if defined(__cpp_concepts)
+
+template <class I>
+concept Referenceable = requires(I& i) { i; };
+
+template <class I>
+concept LegacyIterator = requires(I i) {
+  { *i } -> Referenceable;
+  { ++i } -> std::same_as<I&>;
+  { *i++ } -> Referenceable;
+} && std::copyable<I>;
+
+template <class I>
+concept LegacyInputIterator = LegacyIterator<I> && std::equality_comparable<I> && requires(I i) {
+  typename std::incrementable_traits<I>::difference_type;
+  typename std::indirectly_readable_traits<I>::value_type;
+  typename std::common_reference_t<std::iter_reference_t<I>&&,
+                                   typename std::indirectly_readable_traits<I>::value_type&>;
+  *i++;
+  typename std::common_reference_t<decltype(*i++)&&, typename std::indirectly_readable_traits<I>::value_type&>;
+  requires std::signed_integral<typename std::incrementable_traits<I>::difference_type>;
+};
+
+template <class It>
+concept LegacyForwardIterator =
+    LegacyInputIterator<It> && std::constructible_from<It> && std::is_reference_v<std::iter_reference_t<It>> &&
+    std::same_as<std::remove_cvref_t<std::iter_reference_t<It>>,
+                 typename std::indirectly_readable_traits<It>::value_type> &&
+    requires(It it) {
+      { it++ } -> std::convertible_to<const It&>;
+      { *it++ } -> std::same_as<std::iter_reference_t<It>>;
+    };
+
+static_assert(LegacyForwardIterator<Iterator<std::string>>);
+
+#endif
 
 }  // namespace liteproto::internal_test

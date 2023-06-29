@@ -1,67 +1,77 @@
+//
+// Created by Youtao Guo on 2023/6/30.
+//
+
 #include <cassert>
 #include <iostream>
 #include <map>
 #include <tuple>
 #include <type_traits>
 
+#include "gtest/gtest.h"
 #include "liteproto/liteproto.hpp"
 #include "liteproto/static_test/static_test.hpp"
 
-void test() {
+TEST(TestList, basic) {
   using namespace liteproto;
   std::vector<std::string> strlist;
   auto list = AsList(&strlist);
   for (int i = 0; i < 10; i++) {
     list.push_back(std::to_string(i));
+    EXPECT_EQ(strlist.back(), std::to_string(i));
   }
+  EXPECT_EQ(strlist.size(), 10);
+  EXPECT_EQ(list.size(), 10);
   for (int i = 0; i < 5; i++) {
     list.pop_back();
+    EXPECT_EQ(list.size(), 10 - i - 1);
   }
+  int cnt = 0;
   for (auto& v : list) {
-    std::cout << v << ' ';
     v.append("x");
+    EXPECT_EQ(list[cnt].back(), 'x');
+    cnt++;
   }
-  std::cout << std::endl;
-  for (auto& v : list) {
-    std::cout << v << ' ';
-  }
-  std::cout << std::endl;
+  EXPECT_EQ(list.size(), 5);
   const auto& cref = strlist;
   auto const_list = AsList(&cref);
-  for (int i = 0; i < const_list.size(); i++) {
-    assert(const_list[i].back() == 'x');
+  for (size_t i = 0; i < const_list.size(); i++) {
+    EXPECT_EQ(const_list[i].back(), 'x');
   }
-  for (auto it = const_list.begin(); it != const_list.end(); it++) {
-    std::cout << *it << ' ';
+  cnt = 0;
+  for (auto it = const_list.begin(); it != const_list.end(); it++, cnt++) {
+    EXPECT_EQ(*it, strlist[cnt]);
   }
-  std::cout << std::endl;
 
   Iterator<std::string> it = list.begin();
   std::list<std::string> anol;
   list = AsList(&anol);
-  assert(it != list.begin());
-  assert(list.size() == 0);
+  EXPECT_TRUE(it != list.begin());
+  EXPECT_TRUE(list.begin() == list.end());
+  EXPECT_EQ(list.size(), 0);
+  EXPECT_TRUE(list.empty());
   for (int i = 0; i < 5; i++) {
     list.insert(list.end(), "no" + std::to_string(i));
   }
-  for (auto& v : list) {
-    std::cout << v << ' ';
-  }
-  std::cout << std::endl;
-  list.resize(10, "abc");
+  cnt = 0;
   for (auto& v : anol) {
-    std::cout << v << ' ';
+    EXPECT_EQ(v, "no" + std::to_string(cnt));
+    cnt++;
   }
-  std::cout << std::endl;
+  list.resize(10, "abc");
+  EXPECT_EQ(anol.size(), 10);
+  auto iter = std::next(anol.begin(), 5);
+  for (int i = 5; i < 10; i++) {
+    EXPECT_EQ(*iter, "abc");
+    iter++;
+  }
   while (!list.empty()) {
-    std::cout << *it << ' ';
     it = list.erase(list.begin());
   }
+  EXPECT_EQ(anol.size(), 0);
   list.insert(list.begin(), "new str");
   const_list = list;
-  std::cout << const_list.begin()->c_str();
-
-  std::cout << std::endl;
+  EXPECT_STREQ(const_list.begin()->c_str(), "new str");
 }
 
 void IterateObject(const liteproto::Object& obj) {
@@ -97,7 +107,7 @@ void IterateObject(const liteproto::Object& obj) {
   }
 }
 
-void test2() {
+TEST(TestReflection, Basic) {
   using namespace liteproto;
   std::vector<int> one_dimension;
   std::vector<std::list<int>> two_dimension;
@@ -107,16 +117,18 @@ void test2() {
   obj = GetReflection(&two_dimension);
   IterateObject(obj);
 
-  for (auto i : one_dimension) {
-    std::cout << i << ' ';
+  EXPECT_EQ(one_dimension.size(), 10);
+  for (size_t i = 0; i < one_dimension.size(); i++) {
+    EXPECT_EQ(one_dimension[i], i);
   }
-  std::cout << '\n';
+
+  EXPECT_EQ(two_dimension.size(), 5);
   for (auto& each : two_dimension) {
-    std::cout << '[';
-    for (auto i : each) {
-      std::cout << i << ' ';
+    EXPECT_EQ(each.size(), 10);
+    auto iter = each.begin();
+    for (size_t i = 0; i < each.size(); i++, iter++) {
+      EXPECT_EQ(*iter, i);
     }
-    std::cout << "] ";
   }
 }
 
@@ -130,18 +142,16 @@ TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
       : test_field_(std::move(v1)), test_field2_(std::move(v2)), test_field3_(std::move(v3)) {}
 };
 
-int main() {
-  using namespace liteproto;
-
+TEST(TestMsgFundamenal, basic) {
   TestMessage<int, float, std::string> msg{1, 2.5, "str"};
-  std::cout << msg.test_field() << ' ' << msg.test_field2() << ' ' << msg.test_field3() << '\n';
+  EXPECT_EQ(msg.test_field(), 1);
+  EXPECT_FLOAT_EQ(msg.test_field2(), 2.5);
+  EXPECT_EQ(msg.test_field3(), "str");
   auto tuple_ref = msg.DumpForwardTuple();
   std::get<0>(tuple_ref)++;
   std::get<1>(tuple_ref)--;
   std::get<2>(tuple_ref).append("str");
-  std::cout << msg.test_field() << ' ' << msg.test_field2() << ' ' << msg.test_field3() << '\n';
-
-  test();
-  test2();
-  return 0;
+  EXPECT_EQ(msg.test_field(), 2);
+  EXPECT_FLOAT_EQ(msg.test_field2(), 1.5);
+  EXPECT_EQ(msg.test_field3(), "strstr");
 }

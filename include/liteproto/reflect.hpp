@@ -6,6 +6,7 @@
 
 #include "liteproto/list.hpp"
 #include "liteproto/pair.hpp"
+#include "liteproto/message.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
 #include "liteproto/traits.hpp"

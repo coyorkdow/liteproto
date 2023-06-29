@@ -5,9 +5,7 @@
 #pragma once
 
 #include "liteproto/message.hpp"
-#include "liteproto/pair.hpp"
 #include "liteproto/reflect.hpp"
-#include "liteproto/static_test/static_test.hpp"
 
 #define MESSAGE(msg_name) class msg_name : public liteproto::MessageBase<msg_name, __LINE__>
 

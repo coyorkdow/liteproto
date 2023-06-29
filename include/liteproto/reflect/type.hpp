@@ -181,7 +181,7 @@ struct DescriptorInterface {
 
 class TypeDescriptor {
   template <class Tp>
-  friend class TypeMeta;
+  friend struct TypeMeta;
 
   friend class Object;
 
@@ -221,8 +221,10 @@ struct TypeMeta {
 
   static uint64_t Id() noexcept {
     static uint64_t alloc_addr = 0;
-    uint64_t* addr = &alloc_addr;
-    return *reinterpret_cast<uint64_t*>(&addr);
+    auto addr_val = &alloc_addr;
+    uint64_t id = 0;
+    std::memcpy(&id, &addr_val, sizeof addr_val);
+    return id;
   }
 
   static constexpr size_t SizeOf() noexcept {
