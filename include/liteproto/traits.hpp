@@ -176,12 +176,6 @@ auto HasSubscript(int) -> std::true_type;
 template <class, class>
 auto HasSubscript(float) -> std::false_type;
 
-template <class C, class = std::void_t<decltype(std::declval<C&>().first), decltype(std::declval<C&>().second)>>
-auto IsPair(int) -> std::true_type;
-
-template <class C>
-auto IsPair(float) -> std::false_type;
-
 }  // namespace details
 
 // We have two levels of member function requirement for Containers.
@@ -486,27 +480,27 @@ struct IsArray<Tp, std::void_t<typename ArrayTraits<Tp>::container_type, typenam
 template <class Tp>
 inline constexpr bool IsArrayV = IsArray<Tp>::value;
 
-template <class Pair>
-struct IsPair : decltype(details::IsPair<Pair>(0)) {};
+template <class Pair, class Cond = void>
+struct PairTraits {};
 
 template <class Pair>
-struct IsPair<const Pair> : decltype(details::IsPair<Pair>(0)) {};
+struct PairTraits<Pair, std::void_t<decltype(std::declval<Pair>().first), decltype(std::declval<Pair>().second)>> {
+  using first = decltype(std::declval<Pair>().first);
+  using second = decltype(std::declval<Pair>().second);
+  using value_type = std::pair<first, second>;
+};
+
+template <class Pair>
+struct PairTraits<const Pair> : PairTraits<Pair> {};
+
+template <class Pair, class Cond = void>
+struct IsPair : std::false_type {};
+
+template <class Pair>
+struct IsPair<Pair, std::void_t<typename PairTraits<Pair>::value_type>> : std::true_type {};
 
 template <class Pair>
 inline constexpr bool IsPairV = IsPair<Pair>::value;
-
-template <class Pair, class = std::bool_constant<IsPairV<Pair>>>
-struct PairTraits;
-
-template <class Pair>
-struct PairTraits<Pair, std::false_type> {};
-
-template <class Pair>
-struct PairTraits<Pair, std::true_type> {
-  using first = decltype(std::declval<Pair&>().first);
-  using second = decltype(std::declval<Pair&>().second);
-  using value_type = std::pair<first, second>;
-};
 
 template <class Tp>  // All Strings are direct types.
 struct IsIndirectType : std::bool_constant<!IsStringV<Tp>> {};

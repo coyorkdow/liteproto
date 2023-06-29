@@ -6,21 +6,18 @@
 
 #include <memory>
 
-#include "liteproto/traits.hpp"
 #include "liteproto/interface.hpp"
 #include "liteproto/iterator.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
+#include "liteproto/traits.hpp"
 
 namespace liteproto {
-
-template <class Tp, ConstOption ConstOpt>
-class List;
 
 template <class Tp>
 class List<Tp, ConstOption::NON_CONST> {
   template <class C, class>
-  friend auto AsList(C* container);
+  friend auto AsList(C* container) noexcept;
 
   friend class List<Tp, ConstOption::CONST>;
 
@@ -47,8 +44,8 @@ class List<Tp, ConstOption::NON_CONST> {
   decltype(auto) begin() const { return interface_.begin(obj_); }
   decltype(auto) end() const { return interface_.end(obj_); }
 
-  List(const List& rhs) noexcept = default;
-  List& operator=(const List&) noexcept = default;
+  List(const List& rhs) = default;
+  List& operator=(const List&) = default;
   List(List&&) noexcept = default;
   List& operator=(List&&) noexcept = default;
 
@@ -67,10 +64,10 @@ class List<Tp, ConstOption::NON_CONST> {
 template <class Tp>
 class List<Tp, ConstOption::CONST> {
   template <class C, class>
-  friend auto AsList(C* container);
+  friend auto AsList(C* container) noexcept;
 
  public:
-  decltype(auto) operator[](size_t pos) const { return interface_.operator_subscript(obj_, pos); }
+  decltype(auto) operator[](size_t pos) const noexcept { return interface_.operator_subscript(obj_, pos); }
 
   size_t size() const noexcept { return interface_.size(obj_); }
   bool empty() const noexcept { return interface_.empty(obj_); }
@@ -80,8 +77,8 @@ class List<Tp, ConstOption::CONST> {
   decltype(auto) begin() const noexcept { return interface_.begin(obj_); }
   decltype(auto) end() const noexcept { return interface_.end(obj_); }
 
-  List(const List& rhs) noexcept = default;
-  List& operator=(const List&) noexcept = default;
+  List(const List& rhs) = default;
+  List& operator=(const List&) = default;
   List(List&&) noexcept = default;
   List& operator=(List&&) noexcept = default;
 
@@ -154,7 +151,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   // There is no ListAdapter<const Object>;
   using maybe_const_adapter = std::conditional_t<is_indirect, ListAdapter, ListAdapter<const Tp, void>>;
 
-  explicit ListAdapter(container_type* c) : container_(c) {
+  explicit ListAdapter(container_type* c) noexcept : container_(c) {
     static_assert(std::is_copy_constructible_v<ListAdapter>);
     static_assert(std::is_copy_assignable_v<ListAdapter>);
     static_assert(std::is_nothrow_move_constructible_v<ListAdapter>);
@@ -282,7 +279,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 }  // namespace internal
 
 template <class C, class = internal::ListAdapter<C>>
-auto AsList(C* container) {
+auto AsList(C* container) noexcept {
   internal::ListAdapter<C> adapter{container};
 
   static_assert(std::is_trivially_copyable_v<decltype(adapter)>);

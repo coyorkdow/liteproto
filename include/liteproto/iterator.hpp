@@ -32,7 +32,6 @@ struct IteratorInterface {
   using noteq_t = bool(const std::any&, const Iterator<Tp>&) noexcept;
 
   using adapter_type_id_t = uint64_t(const std::any&) noexcept;
-
   indirection_t* indirection;
   member_of_object_t* member_of_object;
   increment_t* increment;
@@ -44,10 +43,10 @@ template <class IteratorAdapter, class Tp>
 Iterator<Tp> MakeIterator(IteratorAdapter&& it, internal::IteratorInterface<Tp> inter);
 
 template <class Tp_>
-std::any& GetIteratorAdapter(Iterator<Tp_>&);
+std::any& GetIteratorAdapter(Iterator<Tp_>&) noexcept;
 
 template <class Tp_>
-const std::any& GetIteratorAdapter(const Iterator<Tp_>&);
+const std::any& GetIteratorAdapter(const Iterator<Tp_>&) noexcept;
 
 }  // namespace internal
 
@@ -77,15 +76,15 @@ class IteratorBase {
 
   [[nodiscard]] uint64_t AdapterTypeId() const noexcept { return interface_.adapter_type_id(it_); }
 
-  IteratorBase() noexcept = default;
-  IteratorBase(const IteratorBase&) noexcept = default;
+  IteratorBase() = default;
+  IteratorBase(const IteratorBase&) = default;
   IteratorBase(IteratorBase&&) noexcept = default;
-  IteratorBase& operator=(const IteratorBase&) noexcept = default;
+  IteratorBase& operator=(const IteratorBase&) = default;
   IteratorBase& operator=(IteratorBase&&) noexcept = default;
 
  protected:
   template <class ItAdapter>
-  IteratorBase(ItAdapter&& it, const internal::IteratorInterface<Tp>& inter) noexcept
+  IteratorBase(ItAdapter&& it, const internal::IteratorInterface<Tp>& inter)
       : it_(std::forward<ItAdapter>(it)), interface_(inter) {
     static_assert(std::is_copy_constructible<IteratorBase>::value);
     static_assert(std::is_copy_assignable<IteratorBase>::value);
@@ -102,10 +101,10 @@ class Iterator : public IteratorBase<Tp> {
   friend Iterator<Tp_> internal::MakeIterator(IteratorAdapter&& it, internal::IteratorInterface<Tp_> inter);
 
   template <class Tp_>
-  friend std::any& internal::GetIteratorAdapter(Iterator<Tp_>&);
+  friend std::any& internal::GetIteratorAdapter(Iterator<Tp_>&) noexcept;
 
   template <class Tp_>
-  friend const std::any& internal::GetIteratorAdapter(const Iterator<Tp_>&);
+  friend const std::any& internal::GetIteratorAdapter(const Iterator<Tp_>&) noexcept;
 
   template <class Container, class Tp_>
   friend class internal::IteratorAdapter;
@@ -114,10 +113,10 @@ class Iterator : public IteratorBase<Tp> {
   using base = IteratorBase<Tp>;
 
  public:
-  Iterator() noexcept = default;
-  Iterator(const Iterator&) noexcept = default;
+  Iterator() = default;
+  Iterator(const Iterator&) = default;
   Iterator(Iterator&&) noexcept = default;
-  Iterator& operator=(const Iterator&) noexcept = default;
+  Iterator& operator=(const Iterator&) = default;
   Iterator& operator=(Iterator&&) noexcept = default;
 
   bool operator==(const Iterator& rhs) const noexcept { return !(*this != rhs); }
@@ -126,10 +125,10 @@ class Iterator : public IteratorBase<Tp> {
 
  private:
   template <class ItAdapter>
-  Iterator(ItAdapter&& it, const internal::IteratorInterface<Tp>& inter) noexcept
+  Iterator(ItAdapter&& it, const internal::IteratorInterface<Tp>& inter)
       : IteratorBase<Tp>(std::forward<ItAdapter>(it), inter) {}
 
-  explicit Iterator(const base& iterator) noexcept : IteratorBase<Tp>(iterator) {}
+  explicit Iterator(const base& iterator) : IteratorBase<Tp>(iterator) {}
   explicit Iterator(base&& iterator) noexcept : IteratorBase<Tp>(std::move(iterator)) {}
 };
 
@@ -139,10 +138,10 @@ class Iterator<Object> : public IteratorBase<Object> {
   friend Iterator<Tp_> internal::MakeIterator(IteratorAdapter&& it, internal::IteratorInterface<Tp_> inter);
 
   template <class Tp_>
-  friend std::any& internal::GetIteratorAdapter(Iterator<Tp_>&);
+  friend std::any& internal::GetIteratorAdapter(Iterator<Tp_>&) noexcept;
 
   template <class Tp_>
-  friend const std::any& internal::GetIteratorAdapter(const Iterator<Tp_>&);
+  friend const std::any& internal::GetIteratorAdapter(const Iterator<Tp_>&) noexcept;
 
   template <class Container, class Tp_>
   friend class internal::IteratorAdapter;
@@ -151,18 +150,18 @@ class Iterator<Object> : public IteratorBase<Object> {
   using base = IteratorBase<Object>;
 
  public:
-  Iterator() noexcept = default;
-  Iterator(const Iterator&) noexcept = default;
+  Iterator() = default;
+  Iterator(const Iterator&) = default;
   Iterator(Iterator&&) noexcept = default;
-  Iterator& operator=(const Iterator&) noexcept = default;
+  Iterator& operator=(const Iterator&) = default;
   Iterator& operator=(Iterator&&) noexcept = default;
 
  private:
   template <class ItAdapter>
-  Iterator(ItAdapter&& it, const internal::IteratorInterface<Object>& inter) noexcept
+  Iterator(ItAdapter&& it, const internal::IteratorInterface<Object>& inter)
       : IteratorBase<Object>(std::forward<ItAdapter>(it), inter) {}
 
-  explicit Iterator(const base& iterator) noexcept : IteratorBase<Object>(iterator) {}
+  explicit Iterator(const base& iterator) : IteratorBase<Object>(iterator) {}
   explicit Iterator(base&& iterator) noexcept : IteratorBase<Object>(std::move(iterator)) {}
 };
 
@@ -174,12 +173,12 @@ Iterator<Tp> MakeIterator(IteratorAdapter&& it, IteratorInterface<Tp> inter) {
 }
 
 template <class Tp_>
-std::any& GetIteratorAdapter(Iterator<Tp_>& iterator) {
+std::any& GetIteratorAdapter(Iterator<Tp_>& iterator) noexcept {
   return iterator.it_;
 }
 
 template <class Tp_>
-const std::any& GetIteratorAdapter(const Iterator<Tp_>& iterator) {
+const std::any& GetIteratorAdapter(const Iterator<Tp_>& iterator) noexcept {
   return iterator.it_;
 }
 
@@ -221,7 +220,7 @@ struct IteratorInterfaceImpl {
 };
 
 template <class It>
-auto MakeIteratorInterface() {
+auto MakeIteratorInterface() noexcept {
   using value_type = typename It::value_type;
   using impl = IteratorInterfaceImpl<It, value_type>;
   IteratorInterface<value_type> interface {};
@@ -257,7 +256,7 @@ class IteratorAdapter {
                                               typename container_type::iterator>;
 
  public:
-  explicit IteratorAdapter(const wrapped_iterator& it) : it_(it) {
+  explicit IteratorAdapter(const wrapped_iterator& it) noexcept : it_(it) {
     static_assert(std::is_same_v<Object, value_type> ||
                   std::is_same_v<value_type, typename container_type::value_type> ||
                   std::is_same_v<value_type, const typename container_type::value_type>);

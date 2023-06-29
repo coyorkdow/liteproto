@@ -31,9 +31,12 @@
 *.out
 *.app
 
+*.out
+
 cmake-build-debug
 cmake-build-debug-gcc
 cmake-build-release-gcc
+build
 
 .idea
 .vscode

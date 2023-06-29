@@ -20,15 +20,19 @@ using addr_t = std::conditional_t<sizeof(void*) == 4, uint32_t, uint64_t>;
 static_assert(sizeof(addr_t) == sizeof(void*));
 
 class Object;
-template <class Tp, ConstOption>
-auto ListCast(const Object& object) noexcept;
+
+template <class Tp, ConstOption ConstOpt>
+class List;
+
+template <class Tp, ConstOption Opt = ConstOption::NON_CONST>
+std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept;
 
 class Object {
   template <class Tp>
   friend Object GetReflection(Tp* v) noexcept;
 
-  template <class Tp, ConstOption>
-  friend auto ListCast(const Object& object) noexcept;
+  template <class Tp, ConstOption Opt>
+  friend std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept;
 
  public:
   [[nodiscard]] addr_t Addr() const noexcept {
@@ -51,7 +55,7 @@ class Object {
   [[nodiscard]] const TypeDescriptor& Descriptor() const noexcept { return descriptor_; }
 
   Object() noexcept : descriptor_(), addr_(nullptr) {}
-  Object(const Object&) noexcept = default;
+  Object(const Object&) = default;
   Object(Object&& rhs) noexcept
       : descriptor_(rhs.descriptor_),
         ptr_to_value_(std::move(rhs.ptr_to_value_)),
@@ -59,7 +63,7 @@ class Object {
         addr_(rhs.addr_) {
     rhs.addr_ = nullptr;
   }
-  Object& operator=(const Object&) noexcept = default;
+  Object& operator=(const Object&) = default;
   Object& operator=(Object&& rhs) noexcept {
     descriptor_ = rhs.descriptor_;
     ptr_to_value_ = std::move(rhs.ptr_to_value_);

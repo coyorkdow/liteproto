@@ -58,8 +58,8 @@ inline TypeDescriptor TypeMeta<Tp>::MakeDescriptor() noexcept {
   return TypeDescriptor{inter};
 }
 
-template <class Tp, ConstOption Opt = ConstOption::NON_CONST>
-auto ListCast(const Object& object) noexcept {
+template <class Tp, ConstOption Opt>
+std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept {
   using return_type = std::optional<List<Tp, Opt>>;
   auto indirect_ptr = std::any_cast<List<Tp, Opt>>(&object.interface_);
   if (indirect_ptr == nullptr) {
