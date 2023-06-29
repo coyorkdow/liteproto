@@ -4,9 +4,10 @@
 
 #pragma once
 
-#include "message.hpp"
-#include "pair.hpp"
-#include "reflect.hpp"
+#include "liteproto/message.hpp"
+#include "liteproto/pair.hpp"
+#include "liteproto/reflect.hpp"
+#include "liteproto/static_test/static_test.hpp"
 
 #define MESSAGE(msg_name) class msg_name : public liteproto::MessageBase<msg_name, __LINE__>
 
@@ -14,7 +15,7 @@
 
 #define TEMPLATE_MESSAGE(msg_name, arg) class msg_name : public liteproto::MessageBase<msg_name<arg>, __LINE__>
 
-#if defined(__clang__) && !defined(LITE_PROTO_COMPATIBLE_MODE_)
+#if defined(__clang__) && defined(LITE_PROTO_DISABLE_COMPATIBLE_MODE_)
 #define FIELD(name)                                                                                             \
   name##_;                                                                                                      \
                                                                                                                 \

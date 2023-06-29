@@ -7,22 +7,25 @@
 #include <any>
 #include <type_traits>
 
-namespace liteproto {
+#include "liteproto/iterator.hpp"
 
-template <class Tp>
-class Iterator;
+namespace liteproto {
 
 namespace internal {
 
 template <class Tp>
 struct ListInterface {
   using iterator = Iterator<Tp>;
+  using reference = typename iterator::reference;
+  static_assert(std::is_same_v<typename iterator::value_type, Tp>);
 
-  using push_back_t = void(const std::any&, Tp);
+  using push_back_t = void(const std::any&, const Tp&);
+  using emplace_back_t = void(const std::any&, Tp&&);
   using pop_back_t = void(const std::any&);
-  using insert_t = iterator(const std::any&, iterator, Tp);
+  using insert_t = iterator(const std::any&, iterator, const Tp&);
+  using emplace_insert_t = iterator(const std::any&, iterator, Tp&&);
   using erase_t = iterator(const std::any&, iterator);
-  using operator_subscript_t = Tp&(const std::any&, std::size_t);
+  using operator_subscript_t = reference(const std::any&, std::size_t);
   using size_t = std::size_t(const std::any&) noexcept;
   using resize_t = void(const std::any&, std::size_t);
   using resize_append_t = void(const std::any&, std::size_t, const Tp&);
@@ -31,12 +34,15 @@ struct ListInterface {
   using begin_t = iterator(const std::any&) noexcept;
   using end_t = iterator(const std::any&) noexcept;
 
-  using const_interface_t = ListInterface<const Tp>() noexcept;
+  using maybe_const = std::conditional_t<std::is_same_v<Tp, Object>, Tp, const Tp>;
+  using const_interface_t = ListInterface<maybe_const>() noexcept;
   using to_const_t = std::any(const std::any&) noexcept;
 
   push_back_t* push_back;
+  emplace_back_t* emplace_back;
   pop_back_t* pop_back;
   insert_t* insert;
+  emplace_insert_t* emplace_insert;
   erase_t* erase;
   operator_subscript_t* operator_subscript;
   size_t* size;
@@ -86,13 +92,20 @@ struct PairInterfaceImpl {
 template <class Adapter, class Tp>
 struct ListInterfaceImpl {
   using base = ListInterface<Tp>;
-  using iterator = typename ListInterface<Tp>::iterator;
+  using iterator = typename base::iterator;
+  using reference = typename base::reference;
 
-  static void push_back(const std::any& obj, Tp v) {
+  static void push_back(const std::any& obj, const Tp& v) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    (*ptr).push_back(v);
+  }
+  static_assert(std::is_same_v<decltype(push_back), typename base::push_back_t>);
+
+  static void emplace_back(const std::any& obj, Tp&& v) {
     auto* ptr = std::any_cast<Adapter>(&obj);
     (*ptr).push_back(std::move(v));
   }
-  static_assert(std::is_same_v<decltype(push_back), typename base::push_back_t>);
+  static_assert(std::is_same_v<decltype(emplace_back), typename base::emplace_back_t>);
 
   static void pop_back(const std::any& obj) {
     auto* ptr = std::any_cast<Adapter>(&obj);
@@ -100,11 +113,17 @@ struct ListInterfaceImpl {
   }
   static_assert(std::is_same_v<decltype(pop_back), typename base::pop_back_t>);
 
-  static iterator insert(const std::any& obj, iterator pos, Tp v) {
+  static iterator insert(const std::any& obj, iterator pos, const Tp& v) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).insert(std::move(pos), v);
+  }
+  static_assert(std::is_same_v<decltype(insert), typename base::insert_t>);
+
+  static iterator emplace_insert(const std::any& obj, iterator pos, Tp&& v) {
     auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr).insert(std::move(pos), std::move(v));
   }
-  static_assert(std::is_same_v<decltype(insert), typename base::insert_t>);
+  static_assert(std::is_same_v<decltype(emplace_insert), typename base::emplace_insert_t>);
 
   static iterator erase(const std::any& obj, iterator pos) {
     auto* ptr = std::any_cast<Adapter>(&obj);
@@ -112,7 +131,7 @@ struct ListInterfaceImpl {
   }
   static_assert(std::is_same_v<decltype(erase), typename base::erase_t>);
 
-  static Tp& operator_subscript(const std::any& obj, size_t pos) {
+  static reference operator_subscript(const std::any& obj, size_t pos) {
     auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr)[pos];
   }
@@ -160,7 +179,7 @@ struct ListInterfaceImpl {
   }
   static_assert(std::is_same_v<decltype(end), typename base::end_t>);
 
-  static ListInterface<const Tp> ConstInterface() noexcept;
+  static ListInterface<typename base::maybe_const> ConstInterface() noexcept;
   static_assert(std::is_same_v<decltype(ConstInterface), typename base::const_interface_t>);
 
   static std::any ToConst(const std::any& obj) noexcept {
@@ -193,8 +212,10 @@ auto MakeListInterface() {
   using impl = ListInterfaceImpl<Adapter, iterator_value_type>;
   ListInterface<iterator_value_type> interface {};
   interface.push_back = &impl::push_back;
+  interface.emplace_back = &impl::emplace_back;
   interface.pop_back = &impl::pop_back;
   interface.insert = &impl::insert;
+  interface.emplace_insert = &impl::emplace_insert;
   interface.erase = &impl::erase;
   interface.operator_subscript = &impl::operator_subscript;
   interface.size = &impl::size;
@@ -211,31 +232,9 @@ auto MakeListInterface() {
 }
 
 template <class Adapter, class Tp>
-ListInterface<const Tp> ListInterfaceImpl<Adapter, Tp>::ConstInterface() noexcept {
-  using const_adapter = typename Adapter::const_adapter;
+ListInterface<typename ListInterface<Tp>::maybe_const> ListInterfaceImpl<Adapter, Tp>::ConstInterface() noexcept {
+  using const_adapter = typename Adapter::maybe_const_adapter;
   return MakeListInterface<const_adapter>();
-}
-
-template <class Adapter>
-auto MakeStringInterface() {
-  using impl = StringInterfaceImpl<Adapter>;
-  StringInterface interface {};
-  interface.push_back = &impl::push_back;
-  interface.pop_back = &impl::pop_back;
-  interface.insert = &impl::insert;
-  interface.erase = &impl::erase;
-  interface.operator_subscript = &impl::operator_subscript;
-  interface.size = &impl::size;
-  interface.resize = &impl ::resize;
-  interface.resize_append = &impl ::resize_append;
-  interface.empty = &impl::empty;
-  interface.clear = &impl::clear;
-  interface.begin = &impl::begin;
-  interface.end = &impl::end;
-
-  interface.c_str = &impl::c_str;
-  interface.append = &impl::append;
-  return interface;
 }
 
 }  // namespace internal

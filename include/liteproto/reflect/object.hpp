@@ -6,6 +6,7 @@
 
 #include <any>
 #include <cstring>
+#include <optional>
 #include <sstream>
 #include <string>
 
@@ -18,41 +19,84 @@ static_assert(sizeof(void*) == 4 || sizeof(void*) == 8);
 using addr_t = std::conditional_t<sizeof(void*) == 4, uint32_t, uint64_t>;
 static_assert(sizeof(addr_t) == sizeof(void*));
 
-class Object {
- public:
-  Type TypeEnum() const noexcept { return descriptor_.TypeEnum(); }
+class Object;
+template <class Tp, ConstOption>
+auto ListCast(const Object& object) noexcept;
 
-  addr_t Addr() const noexcept {
+class Object {
+  template <class Tp>
+  friend Object GetReflection(Tp* v) noexcept;
+
+  template <class Tp, ConstOption>
+  friend auto ListCast(const Object& object) noexcept;
+
+ public:
+  [[nodiscard]] addr_t Addr() const noexcept {
     addr_t addr = 0;
     std::memcpy(&addr, &addr_, sizeof(addr_t));
     return addr;
   }
 
-  std::string Memory() const {
-    //    std::stringstream stringstream;
+  [[nodiscard]] std::string Memory() const {
     std::string str;
     if (addr_) {
       size_t size = descriptor_.SizeOf();
       str.append(static_cast<const char*>(addr_), size);
-      //      auto* ptr = static_cast<uint8_t*>(addr_);
-      //      for (size_t i = 0; i < size; i++, ptr++) {
-      //        stringstream << std::hex << *ptr;
-      //      }
     }
     return str;
-    //    return stringstream.str();
   }
 
-  std::any Value() const noexcept { return ptr_to_value_; }
+  [[nodiscard]] const std::any& Value() const noexcept { return ptr_to_value_; }
+  [[nodiscard]] bool empty() const noexcept { return addr_ == nullptr; }
+  [[nodiscard]] const TypeDescriptor& Descriptor() const noexcept { return descriptor_; }
 
-  bool empty() const noexcept { return addr_ == nullptr; }
-  TypeDescriptor Descriptor() const noexcept { return descriptor_; }
+  Object() noexcept : descriptor_(), addr_(nullptr) {}
+  Object(const Object&) noexcept = default;
+  Object(Object&& rhs) noexcept
+      : descriptor_(rhs.descriptor_),
+        ptr_to_value_(std::move(rhs.ptr_to_value_)),
+        interface_(std::move(rhs.interface_)),
+        addr_(rhs.addr_) {
+    rhs.addr_ = nullptr;
+  }
+  Object& operator=(const Object&) noexcept = default;
+  Object& operator=(Object&& rhs) noexcept {
+    descriptor_ = rhs.descriptor_;
+    ptr_to_value_ = std::move(rhs.ptr_to_value_);
+    interface_ = std::move(rhs.interface_);
+    addr_ = rhs.addr_;
+    rhs.addr_ = nullptr;
+    return *this;
+  }
 
  private:
+  template <class Tp, class Interface>
+  Object(Tp* value_ptr, Interface interface) noexcept
+      : descriptor_(TypeMeta<Tp>::MakeDescriptor()),
+        ptr_to_value_(value_ptr),
+        interface_(std::move(interface)),
+        addr_(value_ptr) {}
+
+  template <class Tp, class = std::enable_if_t<std::is_scalar_v<Tp>>>
+  explicit Object(Tp* value_ptr) noexcept
+      : descriptor_(TypeMeta<Tp>::MakeDescriptor()), ptr_to_value_(value_ptr), addr_(value_ptr) {}
+
   TypeDescriptor descriptor_;
   std::any ptr_to_value_;
   std::any interface_;
   void* addr_;
 };
+
+template <class Tp>
+[[nodiscard]] Object GetReflection(Tp* v) noexcept;
+
+template <class Tp>
+Tp* ObjectCast(const Object& object) noexcept {
+  auto indirect_ptr = std::any_cast<Tp*>(&object.Value());
+  if (indirect_ptr == nullptr) {
+    return nullptr;
+  }
+  return *indirect_ptr;
+}
 
 }  // namespace liteproto

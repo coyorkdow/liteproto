@@ -5,16 +5,21 @@
 #pragma once
 
 #include <array>
+#include <forward_list>
 #include <iterator>
 #include <list>
 #include <map>
+#include <memory>
 #include <queue>
 #include <set>
 #include <string>
 #include <type_traits>
+#include <unordered_map>
 #include <vector>
 
 namespace liteproto {
+
+class Object;
 
 // Thees are four data structures abstraction that supported by liteproto: list, map, string, array.
 
@@ -34,7 +39,24 @@ namespace liteproto {
 // An array is a fixed-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
 // operator[]). It doesn't support any other way to look up or modify. An array also supports size().
 
-enum class Kind : int8_t { SCALAR, POINTER, MESSAGE, LIST, MAP, STRING, ARRAY, PAIR, OTHER };
+// object types are (possibly cv-qualified) types that are not function types, reference types, or possibly cv-qualified
+// void. scalar types are (possibly cv-qualified) object types that are not array types or class types.
+enum class Kind : int8_t {
+  VOID,
+  SCALAR,
+  REFERENCE,
+  FUNCTION,
+  OBJECT,
+  MESSAGE,
+  SMART_PTR,
+  LIST,
+  MAP,
+  STRING,
+  ARRAY,
+  PAIR,
+  CLASS,
+  UNION
+};
 
 namespace details {
 template <class C,
@@ -292,8 +314,9 @@ inline constexpr bool is_string =
     is_list<Str, Char> && has_c_str_v<Str, Char> && has_append_v<Str, Char> && has_data_v<Str, char>;
 
 template <class C, class V>
-inline constexpr bool is_array = std::is_array_v<C> || (has_subscript_v<C, V> && has_constexpr_size_v<C> &&
-                                                        has_data_v<C, V> && is_forward_iterable_v<C>);
+inline constexpr bool is_array =
+    std::is_array_v<C> ||
+    (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> && is_forward_iterable_v<C>);
 
 // template <class C>
 
@@ -309,6 +332,72 @@ inline constexpr bool is_array = std::is_array_v<C> || (has_subscript_v<C, V> &&
 //   static constexpr Kind kind = Kind::LIST;
 //   using value_type = void;
 // };
+
+template <class Tp, class Cond = void>
+struct SmartPtrTraits {};
+
+template <class Tp>
+struct SmartPtrTraits<std::shared_ptr<Tp>> {
+  using value_type = Tp;
+};
+
+template <class Tp, class Dp>
+struct SmartPtrTraits<std::unique_ptr<Tp, Dp>> {
+  using value_type = Tp;
+};
+
+template <class Tp, class Cond = void>
+struct IsSmartPtr : std::false_type {};
+
+template <class Tp>
+struct IsSmartPtr<Tp, std::void_t<typename SmartPtrTraits<Tp>::value_type>> : std::true_type {};
+
+template <class Tp>
+inline constexpr bool IsSmartPtrV = IsSmartPtr<Tp>::value;
+
+static_assert(IsSmartPtrV<std::unique_ptr<int>> && IsSmartPtrV<std::shared_ptr<void*>>);
+
+#define LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(name)                                                    \
+  template <class Tp, class Cond = void>                                                               \
+  struct STD##name##Traits {};                                                                         \
+  template <class... Args>                                                                             \
+  struct STD##name##Traits<std::name<Args...>> {                                                       \
+    using value_type = typename std::name<Args...>::value_type;                                        \
+  };                                                                                                   \
+  template <class Tp, class Cond = void>                                                               \
+  struct IsSTD##name : std::false_type {};                                                             \
+  template <class Tp>                                                                                  \
+  struct IsSTD##name<Tp, std::void_t<typename STD##name##Traits<Tp>::value_type>> : std::true_type {}; \
+  template <class Tp>                                                                                  \
+  inline constexpr bool IsSTD##name##V = IsSTD##name<Tp>::value;
+
+LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(vector)
+LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(deque)
+LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(list)
+LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(map)
+LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(unordered_map)
+
+static_assert(IsSTDvectorV<std::vector<int>>);
+static_assert(IsSTDdequeV<std::deque<int>>);
+static_assert(IsSTDlistV<std::list<int>>);
+static_assert(IsSTDmapV<std::map<int, int>>);
+static_assert(IsSTDunordered_mapV<std::unordered_map<int, int>>);
+
+#undef LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_
+
+template <class Tp>
+struct IsObject : std::false_type {};
+template <>
+struct IsObject<Object> : std::true_type {};
+template <>
+struct IsObject<const Object> : std::true_type {};
+template <>
+struct IsObject<volatile Object> : std::true_type {};
+template <>
+struct IsObject<const volatile Object> : std::true_type {};
+
+template <class Tp>
+inline constexpr bool IsObjectV = IsObject<Tp>::value;
 
 template <class Tp, class Cond = void>
 struct ListTraits {};
@@ -416,60 +505,61 @@ template <class Pair>
 struct PairTraits<Pair, std::true_type> {
   using first = decltype(std::declval<Pair&>().first);
   using second = decltype(std::declval<Pair&>().second);
+  using value_type = std::pair<first, second>;
 };
 
-namespace internal_test {
+template <class Tp>  // All Strings are direct types.
+struct IsIndirectType : std::bool_constant<!IsStringV<Tp>> {};
 
-static_assert(IsPairV<std::pair<int, IsPair<void>>>);
-static_assert(!IsPairV<void>);
-using p = std::pair<int, IsPair<void>>;
-static_assert(std::is_same_v<typename PairTraits<p>::first, int>);
-static_assert(std::is_same_v<typename PairTraits<p>::second, IsPair<void>>);
+template <>  // Object is indirect. We have to make is indirect so that our definition can be well-formed.
+struct IsIndirectType<Object> : std::true_type {};
 
-static_assert(has_c_str_v<std::string, char>);
-static_assert(has_append_v<std::string, char>);
-static_assert(IsStringV<std::string>);
-static_assert(IsStringV<const std::string>);
-static_assert(IsListV<std::vector<int>>);
-static_assert(IsListV<const std::vector<int>>);
-static_assert(has_subscript_v<std::vector<int>, int>);
+template <>
+struct IsIndirectType<void*> : std::false_type {};
 
-static_assert(has_subscript_v<int[1][2][3], int[2][3]>);
-static_assert(IsArrayV<int[1][2][3]>);
+template <class Tp>
+struct IsIndirectType<const Tp> : IsIndirectType<Tp> {};
 
-static_assert(internal::is_array<std::array<int, 6>, int>);
-static_assert(IsArrayV<std::array<int, 6>>);
+template <class Tp>
+struct IsIndirectType<volatile Tp> : IsIndirectType<Tp> {};
 
-static_assert(!IsListV<std::vector<int>&&>);
-static_assert(IsListV<std::vector<int>>);
-static_assert(!IsListV<const std::deque<int>&>);
-static_assert(IsListV<const std::deque<int>>);
+template <class Tp>
+struct IsIndirectType<const volatile Tp> : IsIndirectType<Tp> {};
 
-static_assert(is_forward_iterator_v<std::list<int>::iterator>);
-static_assert(!is_forward_iterator_v<std::list<int>>);
-static_assert(is_forward_iterable_v<std::list<int>>);
+template <class Tp>
+struct IsIndirectType<Tp*> : IsIndirectType<Tp> {};
 
-static_assert(has_size_v<std::vector<int>>);
-static_assert(has_empty_v<std::vector<int>>);
-static_assert(has_clear_v<std::vector<int>>);
-static_assert(has_capacity_v<const std::vector<int>>);
+template <class Tp>
+struct IsIndirectType<Tp&> : IsIndirectType<Tp> {};
 
-static_assert(has_push_back_v<std::vector<int>, int>);
-static_assert(!has_push_back_v<std::queue<int>, int>);
+template <class Tp>
+struct IsIndirectType<Tp&&> : IsIndirectType<Tp> {};
 
-static_assert(has_pop_back_v<std::vector<int>>);
-static_assert(!has_pop_back_v<std::queue<int>>);
+template <>
+struct IsIndirectType<uint8_t> : std::false_type {};
 
-static_assert(has_erase_v<std::vector<int>>);
-static_assert(has_erase_v<std::map<int, std::string>>);
-static_assert(!has_erase_v<std::array<int, 1>>);
+template <>
+struct IsIndirectType<int8_t> : std::false_type {};
 
-static_assert(has_insert_v<std::vector<int>, int>);
+template <>
+struct IsIndirectType<uint32_t> : std::false_type {};
 
-static_assert(has_constexpr_size_v<int[2][3][4]>);
-static_assert(has_constexpr_size_v<std::array<int, 5>>);
-static_assert(!has_constexpr_size_v<std::vector<int>>);
+template <>
+struct IsIndirectType<int32_t> : std::false_type {};
 
-}  // namespace internal_test
+template <>
+struct IsIndirectType<uint64_t> : std::false_type {};
+
+template <>
+struct IsIndirectType<int64_t> : std::false_type {};
+
+template <>
+struct IsIndirectType<float> : std::false_type {};
+
+template <>
+struct IsIndirectType<double> : std::false_type {};
+
+template <class Tp>
+inline constexpr bool IsIndirectTypeV = IsIndirectType<Tp>::value;
 
 }  // namespace liteproto

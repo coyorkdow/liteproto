@@ -39,8 +39,7 @@ enum class Type : int32_t {
   FLOAT_64,
   BOOLEAN,
 
-  ARRAY,
-
+  OBJECT,
   MESSAGE,
 
   STD_VECTOR,
@@ -147,20 +146,23 @@ class TypeDescriptor;
 namespace internal {
 
 struct DescriptorInterface {
-  using id_t = uint64_t();
-  using kinde_enum_t = Kind();
-  using type_enum_t = Type();
-  using traits_t = bool(traits);
-  using transform_t = TypeDescriptor(transform);
-  using size_of_t = size_t();
-  using alignment_of_t = size_t();
-  using rank_t = size_t();
-  using extent_t = size_t();
+  using id_t = uint64_t() noexcept;
+  using kinde_enum_t = Kind() noexcept;
+  using type_enum_t = Type() noexcept;
+  using traits_t = bool(traits) noexcept;
+  using transform_t = TypeDescriptor(transform) noexcept;
+  using size_of_t = size_t() noexcept;
+  using alignment_of_t = size_t() noexcept;
+  using rank_t = size_t() noexcept;
+  using extent_t = size_t() noexcept;
 
-  using value_type_t = TypeDescriptor();
+  using value_type_t = TypeDescriptor() noexcept;
+
+  using is_indirect_type_t = bool() noexcept;
+  using default_value = std::pair<Object, std::any>() noexcept;
 
   id_t* id_;
-  kinde_enum_t* kind_;
+  kinde_enum_t* kind_enum_;
   type_enum_t* type_enum_;
   traits_t* traits_;
   transform_t* transform_;
@@ -170,6 +172,9 @@ struct DescriptorInterface {
   extent_t* extent_;
 
   value_type_t* value_type_;
+
+  is_indirect_type_t* is_indirect_type_;
+  default_value* default_value_;
 };
 
 }  // namespace internal
@@ -178,46 +183,41 @@ class TypeDescriptor {
   template <class Tp>
   friend class TypeMeta;
 
+  friend class Object;
+
  public:
-  uint64_t Id() const noexcept { return inter_.id_(); }
-  Kind KindEnum() const noexcept { return inter_.kind_(); }
-  Type TypeEnum() const noexcept { return inter_.type_enum_(); }
-  bool Traits(traits t) const noexcept { return inter_.traits_(t); }
-  TypeDescriptor Transform(transform t) const noexcept { return inter_.transform_(t); }
+  [[nodiscard]] uint64_t Id() const noexcept { return inter_.id_(); }
+  [[nodiscard]] Kind KindEnum() const noexcept { return inter_.kind_enum_(); }
+  [[nodiscard]] Type TypeEnum() const noexcept { return inter_.type_enum_(); }
+  [[nodiscard]] bool Traits(traits t) const noexcept { return inter_.traits_(t); }
+  [[nodiscard]] TypeDescriptor Transform(transform t) const noexcept { return inter_.transform_(t); }
 
-  size_t SizeOf() const noexcept { return inter_.size_of_(); }
-  size_t AlignmentOf() const noexcept { return inter_.alignment_of_(); }
-  size_t Rank() const noexcept { return inter_.rank_(); }
-  size_t Extent() const noexcept { return inter_.extent_(); }
+  [[nodiscard]] bool IsIndirectType() const noexcept { return inter_.is_indirect_type_(); }
+  [[nodiscard]] inline std::pair<Object, std::any> DefaultValue() const noexcept;
 
-  TypeDescriptor ValueType() const noexcept { return inter_.value_type_(); }
+  [[nodiscard]] size_t SizeOf() const noexcept { return inter_.size_of_(); }
+  [[nodiscard]] size_t AlignmentOf() const noexcept { return inter_.alignment_of_(); }
+  [[nodiscard]] size_t Rank() const noexcept { return inter_.rank_(); }
+  [[nodiscard]] size_t Extent() const noexcept { return inter_.extent_(); }
+
+  [[nodiscard]] TypeDescriptor ValueType() const noexcept { return inter_.value_type_(); }
 
   bool operator==(const TypeDescriptor& rhs) const { return Id() == rhs.Id(); }
   bool operator!=(const TypeDescriptor& rhs) const { return Id() != rhs.Id(); }
 
  private:
-  explicit constexpr TypeDescriptor(internal::DescriptorInterface inter) : inter_(inter) {}
+  TypeDescriptor() = default;
+
+  explicit constexpr TypeDescriptor(const internal::DescriptorInterface& inter) : inter_(inter) {}
   internal::DescriptorInterface inter_;
 };
 
 template <class Tp>
 struct TypeMeta {
-  static TypeDescriptor MakeDescriptor() noexcept {
-    internal::DescriptorInterface inter{};
-    inter.id_ = &Id;
-    inter.size_of_ = &SizeOf;
-    inter.alignment_of_ = &AlignmentOf;
-    inter.rank_ = &Rank;
-    inter.extent_ = &Extent;
-    inter.transform_ = &Transform;
-    inter.type_enum_ = &TypeEnum;
-    inter.traits_ = &Traits;
-    inter.transform_ = &Transform;
+  static inline TypeDescriptor MakeDescriptor() noexcept;
+  static inline std::pair<Object, std::any> DefaultValue() noexcept;
 
-    inter.value_type_ = &ValueType;
-
-    return TypeDescriptor{inter};
-  }
+  static constexpr bool IsIndirectType() noexcept { return IsIndirectTypeV<Tp>; }
 
   static uint64_t Id() noexcept {
     static uint64_t alloc_addr = 0;
@@ -225,8 +225,18 @@ struct TypeMeta {
     return *reinterpret_cast<uint64_t*>(&addr);
   }
 
-  static constexpr size_t SizeOf() noexcept { return sizeof(Tp); }
-  static constexpr size_t AlignmentOf() noexcept { return std::alignment_of_v<Tp>; }
+  static constexpr size_t SizeOf() noexcept {
+    if constexpr (!std::is_void_v<Tp>) {
+      return sizeof(Tp);
+    }
+    return 0;
+  }
+  static constexpr size_t AlignmentOf() noexcept {
+    if constexpr (!std::is_void_v<Tp>) {
+      return std::alignment_of_v<Tp>;
+    }
+    return 0;
+  }
   //  If T is an array type, provides the member constant value equal to the number of dimensions of the array. For any
   //  other type, value is 0.
   static constexpr size_t Rank() noexcept { return std::rank_v<Tp>; }
@@ -235,7 +245,7 @@ struct TypeMeta {
   // along its first dimension and N is 0, value is 0.
   static constexpr size_t Extent() noexcept { return std::extent_v<Tp>; }
 
-  static TypeDescriptor Transform(transform t) noexcept {
+  static constexpr TypeDescriptor Transform(transform t) noexcept {
     switch (t) {
       case transform::remove_const:
         return remove_const();
@@ -250,40 +260,71 @@ struct TypeMeta {
       case transform::remove_all_extents:
         return remove_all_extents();
     }
+    return TypeMeta<void>::MakeDescriptor();
   }
 
-  static TypeDescriptor remove_const() noexcept {
+  static constexpr TypeDescriptor remove_const() noexcept {
     using next_meta = TypeMeta<std::remove_const_t<Tp>>;
     return next_meta::MakeDescriptor();
   }
-  static TypeDescriptor remove_volatile() noexcept {
+  static constexpr TypeDescriptor remove_volatile() noexcept {
     using next_meta = TypeMeta<std::remove_volatile_t<Tp>>;
     return next_meta::MakeDescriptor();
   }
-  static TypeDescriptor remove_reference() noexcept {
+  static constexpr TypeDescriptor remove_reference() noexcept {
     using next_meta = TypeMeta<std::remove_reference_t<Tp>>;
     return next_meta::MakeDescriptor();
   }
-  static TypeDescriptor remove_pointer() noexcept {
+  static constexpr TypeDescriptor remove_pointer() noexcept {
     using next_meta = TypeMeta<std::remove_pointer_t<Tp>>;
     return next_meta::MakeDescriptor();
   }
-  static TypeDescriptor remove_extent() noexcept {
+  static constexpr TypeDescriptor remove_extent() noexcept {
     using next_meta = TypeMeta<std::remove_extent_t<Tp>>;
     return next_meta::MakeDescriptor();
   }
-  static TypeDescriptor remove_all_extents() noexcept {
+  static constexpr TypeDescriptor remove_all_extents() noexcept {
     using next_meta = TypeMeta<std::remove_all_extents_t<Tp>>;
     return next_meta::MakeDescriptor();
   }
 
-  static constexpr TypeDescriptor ValueType() noexcept;
-
-  static constexpr Kind KindEnum() {
+  static constexpr TypeDescriptor ValueType() noexcept {
     if constexpr (std::is_pointer_v<Tp>) {
-      return Kind::POINTER;
+      return remove_pointer();
+    } else if constexpr (std::is_reference_v<Tp>) {
+      return remove_reference();
+    } else if constexpr (std::is_array_v<Tp>) {
+      return remove_extent();
+    } else if constexpr (IsSmartPtrV<Tp>) {
+      return TypeMeta<typename SmartPtrTraits<Tp>::value_type>::MakeDescriptor();
+    } else if constexpr (IsListV<Tp>) {
+      using traits = ListTraits<Tp>;
+      return TypeMeta<typename traits::value_type>::MakeDescriptor();
+    } else if constexpr (IsArrayV<Tp>) {
+      using traits = ArrayTraits<Tp>;
+      return TypeMeta<typename traits::value_type>::MakeDescriptor();
+    } else if constexpr (IsPairV<Tp>) {
+      using traits = PairTraits<Tp>;
+      return TypeMeta<typename traits::value_type>::MakeDescriptor();
+    }
+
+    return TypeMeta<void>::MakeDescriptor();
+  }
+
+  static constexpr Kind KindEnum() noexcept {
+    if constexpr (IsObjectV<Tp>) {
+      return Kind::OBJECT;
+    } else if constexpr (std::is_void_v<Tp>) {
+      return Kind::VOID;
     } else if constexpr (std::is_scalar_v<Tp>) {
+      static_assert(std::is_scalar_v<std::nullptr_t>);
       return Kind::SCALAR;
+    } else if constexpr (std::is_reference_v<Tp>) {
+      return Kind::REFERENCE;
+    } else if constexpr (std::is_function_v<Tp>) {
+      return Kind::FUNCTION;
+    } else if constexpr (IsSmartPtrV<Tp>) {
+      return Kind::SMART_PTR;
     } else if constexpr (IsStringV<Tp>) {
       return Kind::STRING;
     } else if constexpr (IsListV<Tp>) {
@@ -292,13 +333,18 @@ struct TypeMeta {
       return Kind::ARRAY;
     } else if constexpr (IsPairV<Tp>) {
       return Kind::PAIR;
+    } else if constexpr (std::is_class_v<Tp>) {
+      return Kind::CLASS;
+    } else {
+      static_assert(std::is_union_v<Tp>);
+      return Kind::UNION;
     }
-
-    return Kind::OTHER;
   }
 
   static constexpr Type TypeEnum() noexcept {
-    if constexpr (std::is_same_v<Tp, uint8_t>) {
+    if constexpr (std::is_same_v<Tp, Object>) {
+      return Type::OBJECT;
+    } else if constexpr (std::is_same_v<Tp, uint8_t>) {
       return Type::UINT8;
     } else if constexpr (std::is_same_v<Tp, int8_t>) {
       return Type::INT8;
@@ -314,9 +360,25 @@ struct TypeMeta {
       return Type::FLOAT_32;
     } else if constexpr (std::is_same_v<Tp, double>) {
       return Type::FLOAT_64;
-    } else if constexpr (std::is_array_v<Tp>) {
-      return Type::ARRAY;
+    } else if constexpr (std::is_void_v<Tp>) {
+      return Type::VOID;
+    } else if constexpr (std::is_same_v<Tp, std::string>) {
+      return Type::STD_STRING;
+    } else if constexpr (IsSTDvectorV<Tp>) {
+      return Type::STD_VECTOR;
+    } else if constexpr (IsSTDdequeV<Tp>) {
+      return Type::STD_DEQUE;
+    } else if constexpr (IsSTDlistV<Tp>) {
+      return Type::STD_LIST;
+    } else if constexpr (IsSTDmapV<Tp>) {
+      return Type::STD_MAP;
+    } else if constexpr (IsSTDunordered_mapV<Tp>) {
+      return Type::STD_UNORDERED_MAP;
+    } else if constexpr (std::is_same_v<Tp, std::any>) {
+      return Type::STD_ANY;
     }
+
+    return Type::OTHER;
   }
 
   static constexpr bool Traits(traits t) noexcept {
@@ -382,6 +444,7 @@ struct TypeMeta {
       LITE_PROTO_TRAITS_CASE_(has_unique_object_representations);
 #undef LITE_PROTO_TRAITS_CASE_
     }
+    return true;
   }
 };
 

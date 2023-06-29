@@ -6,9 +6,10 @@
 
 #include <memory>
 
+#include "liteproto/traits.hpp"
 #include "liteproto/interface.hpp"
 #include "liteproto/iterator.hpp"
-#include "liteproto/reflect/traits.hpp"
+#include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
 
 namespace liteproto {
@@ -26,10 +27,12 @@ class List<Tp, ConstOption::NON_CONST> {
  public:
   using iterator = Iterator<Tp>;
 
-  void push_back(Tp v) const { interface_.push_back(obj_, std::move(v)); }
+  void push_back(const Tp& v) const { interface_.push_back(obj_, v); }
+  void push_back(Tp&& v) const { interface_.emplace_back(obj_, std::move(v)); }
   void pop_back() const { interface_.pop_back(obj_); }
 
-  iterator insert(iterator pos, Tp v) const { return interface_.insert(obj_, pos, std::move(v)); }
+  iterator insert(iterator pos, const Tp& v) const { return interface_.insert(obj_, std::move(pos), v); }
+  iterator insert(iterator pos, Tp&& v) const { return interface_.emplace_insert(obj_, std::move(pos), std::move(v)); }
   iterator erase(iterator pos) const { return interface_.erase(obj_, pos); }
 
   decltype(auto) operator[](size_t pos) const { return interface_.operator_subscript(obj_, pos); }
@@ -49,8 +52,6 @@ class List<Tp, ConstOption::NON_CONST> {
   List(List&&) noexcept = default;
   List& operator=(List&&) noexcept = default;
 
-  operator List<Tp, ConstOption::CONST>() noexcept { return List<Tp, ConstOption::CONST>{*this}; }
-
  private:
   template <class Adapter>
   List(Adapter&& adapter, internal::ListInterface<Tp> interface) noexcept
@@ -59,8 +60,8 @@ class List<Tp, ConstOption::NON_CONST> {
     static_assert(std::is_nothrow_move_constructible_v<List>);
   }
 
-  internal::ListInterface<Tp> interface_;
   std::any obj_;
+  internal::ListInterface<Tp> interface_;
 };
 
 template <class Tp>
@@ -84,9 +85,9 @@ class List<Tp, ConstOption::CONST> {
   List(List&&) noexcept = default;
   List& operator=(List&&) noexcept = default;
 
-  explicit List(const List<Tp, ConstOption::NON_CONST>& rhs) noexcept
+  List(const List<Tp, ConstOption::NON_CONST>& rhs) noexcept
       : interface_(rhs.interface_.const_interface()), obj_(rhs.interface_.to_const(rhs.obj_)) {}
-  explicit List(List<Tp, ConstOption::NON_CONST>&& rhs) noexcept
+  List(List<Tp, ConstOption::NON_CONST>&& rhs) noexcept
       : interface_(rhs.interface_.const_interface()), obj_(rhs.interface_.to_const(rhs.obj_)) {}
   List& operator=(const List<Tp, ConstOption::NON_CONST>& rhs) noexcept {
     this->interface_ = rhs.interface_.const_interface();
@@ -100,29 +101,58 @@ class List<Tp, ConstOption::CONST> {
   }
 
  private:
+  using interface_type = internal::ListInterface<std::conditional_t<std::is_same_v<Tp, Object>, Tp, const Tp>>;
   template <class Adapter>
-  List(Adapter&& adapter, internal::ListInterface<const Tp> interface) noexcept
+  List(Adapter&& adapter, interface_type interface) noexcept
       : obj_(std::forward<Adapter>(adapter)), interface_(interface) {}
 
-  internal::ListInterface<const Tp> interface_;
   std::any obj_;
+  interface_type interface_;
+};
+
+template <ConstOption ConstOpt>
+class List<const Object, ConstOpt> {
+ public:
+  List() = delete;
+};
+
+template <ConstOption ConstOpt>
+class List<volatile Object, ConstOpt> {
+ public:
+  List() = delete;
+};
+
+template <ConstOption ConstOpt>
+class List<const volatile Object, ConstOpt> {
+ public:
+  List() = delete;
 };
 
 namespace internal {
 
+template <class Tp, class = void>
+class ListAdapter;
+
 template <class Tp>
-class ListAdapter<Tp, std::enable_if_t<IsListV<Tp> && IsImmediateTypeV<typename ListTraits<Tp>::value_type>>> {
+class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   static_assert(!std::is_reference_v<Tp>);
   using list_traits = ListTraits<Tp>;
 
  public:
-  using container_type = typename list_traits::container_type;  // TODO recursive container_type
-  using value_type = typename list_traits::value_type;
-  using iterator = typename List<value_type, static_cast<ConstOption>(std::is_const_v<container_type>)>::iterator;
-  using iterator_value_type = std::conditional_t<std::is_const_v<container_type>, const value_type, value_type>;
-  using iterator_adapter = IteratorAdapter<container_type, iterator_value_type>;
+  // What is the ListAdapter for Object supposed to do?
+  // It still directly accesses the indirect object inside the class. Only if when visiting through the methods,
+  // the adapter creates an Object instance as the proxy of underlying indirect object.
+  static constexpr bool is_indirect = IsIndirectTypeV<typename list_traits::value_type>;
 
-  using const_adapter = ListAdapter<const Tp, void>;
+  using container_type = typename list_traits::container_type;
+  using value_type = std::conditional_t<is_indirect, Object, typename list_traits::value_type>;
+  using unerlying_value_type = typename list_traits::value_type;
+  using iterator = typename List<value_type, static_cast<ConstOption>(std::is_const_v<container_type>)>::iterator;
+  using iterator_value_type = typename iterator::value_type;
+  using iterator_reference = typename iterator::reference;
+  using iterator_adapter = IteratorAdapter<container_type, iterator_value_type>;
+  // There is no ListAdapter<const Object>;
+  using maybe_const_adapter = std::conditional_t<is_indirect, ListAdapter, ListAdapter<const Tp, void>>;
 
   explicit ListAdapter(container_type* c) : container_(c) {
     static_assert(std::is_copy_constructible_v<ListAdapter>);
@@ -131,12 +161,22 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp> && IsImmediateTypeV<typename 
     static_assert(std::is_trivially_copyable_v<ListAdapter>);
   }
 
-  void push_back(value_type v) const {
+  template <class Value>
+  void push_back(Value&& v) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
     if constexpr (!std::is_const_v<container_type>) {
-      container_->push_back(std::move(v));
+      if constexpr (!std::is_same_v<value_type, Object>) {
+        container_->push_back(std::forward<Value>(v));
+      } else {
+        auto v_ptr = ObjectCast<unerlying_value_type>(v);
+        if (v_ptr != nullptr) {
+          // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
+          container_->push_back(std::move(*v_ptr));
+        }
+      }
     }
   }
+
   void pop_back() const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
     if constexpr (!std::is_const_v<container_type>) {
@@ -145,11 +185,15 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp> && IsImmediateTypeV<typename 
   }
 
   // operator[] could be either const or non-const. So the return type should be exact the iterator_value_type.
-  iterator_value_type& operator[](size_t pos) const {
+  iterator_reference operator[](size_t pos) const {
     using std::begin;
     auto it = begin(*container_);
     std::advance(it, pos);
-    return *it;
+    if constexpr (!std::is_same_v<value_type, Object>) {
+      return *it;
+    } else {
+      return GetReflection(&(*it));
+    }
   }
 
   void resize(size_t count) const {
@@ -158,10 +202,18 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp> && IsImmediateTypeV<typename 
       container_->resize(count);
     }
   }
+
   void resize(size_t count, const value_type& v) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
     if constexpr (!std::is_const_v<container_type>) {
-      container_->resize(count, v);
+      if constexpr (!std::is_same_v<value_type, Object>) {
+        container_->resize(count, v);
+      } else {
+        auto v_ptr = ObjectCast<unerlying_value_type>(v);
+        if (v_ptr != nullptr) {
+          container_->resize(count, *v_ptr);
+        }
+      }
     }
   }
 
@@ -176,35 +228,52 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp> && IsImmediateTypeV<typename 
 
   iterator begin() const noexcept {
     iterator_adapter adapter{container_->begin()};
-    return iterator{std::move(adapter), MakeIteratorInterface<decltype(adapter)>()};
+    return internal::MakeIterator(std::move(adapter), MakeIteratorInterface<decltype(adapter)>());
   }
 
   iterator end() const noexcept {
     iterator_adapter adapter{container_->end()};
-    return iterator{std::move(adapter), MakeIteratorInterface<decltype(adapter)>()};
+    return internal::MakeIterator(std::move(adapter), MakeIteratorInterface<decltype(adapter)>());
   }
 
-  iterator insert(iterator pos, value_type v) const {
+  iterator insert(iterator pos, const value_type& v) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
     if constexpr (!std::is_const_v<container_type>) {
-      auto any_iter = &pos.it_;
-      auto rhs_it = std::any_cast<iterator_adapter>(any_iter);
-      rhs_it->InsertMyself(container_, std::move(v));
+      if constexpr (!std::is_same_v<value_type, Object>) {
+        auto& any_iter = internal::GetIteratorAdapter(pos);
+        auto rhs_it = std::any_cast<iterator_adapter>(&any_iter);
+        if (rhs_it == nullptr) {
+          return end();
+        }
+        if constexpr (!std::is_same_v<value_type, Object>) {
+          rhs_it->InsertMyself(container_, v);
+          return pos;
+        } else {
+          auto v_ptr = ObjectCast<unerlying_value_type>(v);
+          if (v_ptr != nullptr) {
+            // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
+            rhs_it.InsertMyself(container_, std::move(*v_ptr));
+          }
+        }
+      }
     }
-    return pos;
+    return end();
   }
 
   iterator erase(iterator pos) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
     if constexpr (!std::is_const_v<container_type>) {
-      auto any_iter = &pos.it_;
-      auto rhs_it = std::any_cast<iterator_adapter>(any_iter);
-      rhs_it->EraseMyself(container_);
+      auto& any_iter = internal::GetIteratorAdapter(pos);
+      auto rhs_it = std::any_cast<iterator_adapter>(&any_iter);
+      if (rhs_it != nullptr) {
+        rhs_it->EraseMyself(container_);
+        return pos;
+      }
     }
-    return pos;
+    return end();
   }
 
-  [[nodiscard]] std::any ToConst() const noexcept { return const_adapter{container_}; }
+  [[nodiscard]] std::any ToConst() const noexcept { return maybe_const_adapter{container_}; }
 
  private:
   container_type* container_;
