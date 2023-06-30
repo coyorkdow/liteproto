@@ -138,7 +138,7 @@ TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
   T2 FIELD(test_field2)->Seq<2>;
   T3 FIELD(test_field3)->Seq<3>;
 
-  constexpr TestMessage(T1 v1, T2 v2, T3 v3)
+  TestMessage(T1 v1, T2 v2, T3 v3) noexcept
       : test_field_(std::move(v1)), test_field2_(std::move(v2)), test_field3_(std::move(v3)) {}
 };
 

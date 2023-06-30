@@ -11,7 +11,7 @@
 #include <string>
 
 #include "liteproto/reflect/type.hpp"
-#include "liteproto/traits.hpp"
+#include "liteproto/traits/traits.hpp"
 
 namespace liteproto {
 

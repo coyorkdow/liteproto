@@ -5,11 +5,11 @@
 #pragma once
 
 #include "liteproto/list.hpp"
-#include "liteproto/pair.hpp"
 #include "liteproto/message.hpp"
+#include "liteproto/pair.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
-#include "liteproto/traits.hpp"
+#include "liteproto/traits/traits.hpp"
 
 namespace liteproto {
 

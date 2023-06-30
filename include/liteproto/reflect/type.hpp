@@ -10,7 +10,7 @@
 #include <typeinfo>
 #include <utility>
 
-#include "liteproto/traits.hpp"
+#include "liteproto/traits/traits.hpp"
 
 using uint8_t = std::uint8_t;
 using int8_t = std::int8_t;
@@ -27,6 +27,53 @@ using size_t = std::size_t;
 
 namespace liteproto {
 
+// Thees are four data structures abstraction that supported by liteproto: list, map, string, array.
+
+// A list is a flexible-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
+// operator[]), but no random accessible required. A list also supports push_back and pop_back, and inserts a
+// new element to arbitrary position.
+// A list also supports size(), empty(), and clear().
+
+// A map is an key-value pairs collection. Each key must be unique in a map, and the value can be looked up via the
+// corresponding key. A map uses get() to look up and update() to modify. A map also supports size(), empty(), and
+// clear().
+
+// A string is almost the same as a list, except it doesn't be regarded as a container_type. A string is represented
+// by a single value, like "123" or "abc". Since the String is not a container_type, the underlying type cannot be
+// further inspected. A string supports all the operators that list supports.
+
+// An array is a fixed-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
+// operator[]). It doesn't support any other way to look up or modify. An array also supports size().
+
+// object types are (possibly cv-qualified) types that are not function types, reference types, or possibly cv-qualified
+// void. scalar types are (possibly cv-qualified) object types that are not array types or class types.
+enum class Kind : int8_t {
+  VOID,
+  SCALAR,
+  REFERENCE,
+  FUNCTION,
+  OBJECT,  // it means the Object in liteproto, not the std::is_object.
+  MESSAGE,
+  SMART_PTR,
+  LIST,
+  MAP,
+  STRING,
+  ARRAY,
+  PAIR,
+  CLASS,
+  UNION
+};
+
+// What is the difference between Kind enum and Type enum? Kind means the category of the specified type. e.g., all
+// references are REFERENCE kind. And all the types that can be manipulated through the List interface are LIST kind.
+// And Type enum, on the other hand, indicates what exactly the type is. e.g., 32-bits signed integer is INT32 type, and
+// double is FLOAT64 type. Some Type enums also indicate the template container in STL, like std::vector and std::map.
+// It's because we regulate the Traits() method of TypeDescriptor offers all the unary predicates from <type_traits>,
+// and there is no such trait of std::is_vector. So we offer such inspection in different ways.
+// Since the goal of Type enum is to indicate the exact type. It has a stricter rule than Kind enum. For example, a
+// const std::shared_ptr is also a kind of smart pointer, but its Type is not SHARED_PTR. SHARED_PTR only comes after a
+// remove_const transform.
+
 enum class Type : int32_t {
   VOID,
   UINT8,
@@ -35,12 +82,15 @@ enum class Type : int32_t {
   INT32,
   UINT64,
   INT64,
-  FLOAT_32,
-  FLOAT_64,
+  FLOAT32,
+  FLOAT64,
   BOOLEAN,
 
   OBJECT,
   MESSAGE,
+
+  SHARED_PTR,
+  UNIQUE_PTR,
 
   STD_VECTOR,
   STD_DEQUE,
@@ -325,7 +375,7 @@ struct TypeMeta {
       return Kind::REFERENCE;
     } else if constexpr (std::is_function_v<Tp>) {
       return Kind::FUNCTION;
-    } else if constexpr (IsSmartPtrV<Tp>) {
+    } else if constexpr (IsSmartPtrV<std::remove_cv_t<Tp>>) {  // manually remove the cv-qualifiers
       return Kind::SMART_PTR;
     } else if constexpr (IsStringV<Tp>) {
       return Kind::STRING;
@@ -359,11 +409,18 @@ struct TypeMeta {
     } else if constexpr (std::is_same_v<Tp, int64_t>) {
       return Type::INT64;
     } else if constexpr (std::is_same_v<Tp, float>) {
-      return Type::FLOAT_32;
+      return Type::FLOAT32;
     } else if constexpr (std::is_same_v<Tp, double>) {
-      return Type::FLOAT_64;
+      return Type::FLOAT64;
     } else if constexpr (std::is_void_v<Tp>) {
       return Type::VOID;
+    } else if constexpr (IsSmartPtrV<Tp>) {
+      if constexpr (SmartPtrTraits<Tp>::category == UNIQUE_PTR) {
+        return Type::UNIQUE_PTR;
+      } else {
+        static_assert(SmartPtrTraits<Tp>::category == SHARED_PTR);
+        return Type::SHARED_PTR;
+      }
     } else if constexpr (std::is_same_v<Tp, std::string>) {
       return Type::STD_STRING;
     } else if constexpr (IsSTDvectorV<Tp>) {
@@ -376,6 +433,8 @@ struct TypeMeta {
       return Type::STD_MAP;
     } else if constexpr (IsSTDunordered_mapV<Tp>) {
       return Type::STD_UNORDERED_MAP;
+    } else if constexpr (IsSTDarrayV<Tp>) {
+      return Type::STD_ARRAY;
     } else if constexpr (std::is_same_v<Tp, std::any>) {
       return Type::STD_ANY;
     }

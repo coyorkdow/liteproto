@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include "liteproto/traits.hpp"
 #include "liteproto/reflect.hpp"
+#include "liteproto/traits/traits.hpp"
 
 namespace liteproto::internal_test {
 

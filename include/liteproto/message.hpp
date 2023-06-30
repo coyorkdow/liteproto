@@ -22,7 +22,7 @@ class MessageBase {
   static constexpr auto GetFieldIndexByName(const char (&str)[N]) {
     constexpr auto indices = FieldsIndices::value;
     if constexpr (I >= indices.size()) {
-      return PII{-1, -1};
+      return internal::PII{-1, -1};
     } else if (StrLiteralEQ(str, Msg::FIELD_name(int32_constant<indices[I].second>{}))) {
       return indices[I];
     } else {
@@ -42,10 +42,10 @@ class MessageBase {
 
   struct FieldsIndices {
 #if defined(__clang__) && defined(LITE_PROTO_DISABLE_COMPATIBLE_MODE_)
-    static constexpr auto value = GetAllFields<Msg>();
+    static constexpr auto value = internal::GetAllFields<Msg>();
 // #elif defined(__GNUC__) || defined(__GNUG__)
 #else
-    static constexpr auto value = GetAllFields2<Msg>();
+    static constexpr auto value = internal::GetAllFields2<Msg>();
 #endif
   };
 

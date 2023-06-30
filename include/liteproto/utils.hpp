@@ -8,6 +8,12 @@
 #include <type_traits>
 #include <utility>
 
+#ifndef LITE_PROTO_SCAN_FIELD_RANGE_
+#define LITE_PROTO_SCAN_FIELD_RANGE_ 192
+#endif
+
+static_assert(LITE_PROTO_SCAN_FIELD_RANGE_ % 4 == 0, "LITE_PROTO_SCAN_FIELD_RANGE_ must be the multiple of 4");
+
 namespace liteproto {
 
 template <int32_t N>
@@ -16,6 +22,7 @@ using int32_constant = std::integral_constant<int32_t, N>;
 template <int32_t N>
 using Seq = int32_constant<N>;
 
+namespace internal {
 using PII = std::pair<int32_t, int32_t>;
 
 template <size_t N, size_t M>
@@ -89,10 +96,11 @@ constexpr decltype(auto) GetAllFieldsImpl() {
 
 template <class Tp>
 constexpr decltype(auto) GetAllFields() {
-  constexpr auto res1 = GetAllFieldsImpl<Tp, Tp::FIELDS_start, Tp::FIELDS_start + 128>();
-  constexpr auto res2 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + 128, Tp::FIELDS_start + 256>();
-  constexpr auto res3 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + 256, Tp::FIELDS_start + 384>();
-  constexpr auto res4 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + 384, Tp::FIELDS_start + 512>();
+  constexpr size_t round_num = LITE_PROTO_SCAN_FIELD_RANGE_ / 4;
+  constexpr auto res1 = GetAllFieldsImpl<Tp, Tp::FIELDS_start, Tp::FIELDS_start + round_num>();
+  constexpr auto res2 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + round_num, Tp::FIELDS_start + round_num * 2>();
+  constexpr auto res3 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + round_num * 2, Tp::FIELDS_start + round_num * 3>();
+  constexpr auto res4 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + round_num * 3, Tp::FIELDS_start + round_num * 4>();
   constexpr auto concat1 =
       ConcatSTDArray(std::make_index_sequence<res1.size()>{}, std::make_index_sequence<res2.size()>{}, res1, res2);
   constexpr auto concat2 =
@@ -123,10 +131,11 @@ constexpr decltype(auto) GetAllFields2Impl() {
 
 template <class Tp>
 constexpr decltype(auto) GetAllFields2() {
-  constexpr auto res1 = GetAllFields2Impl<Tp, Tp::FIELDS_start, Tp::FIELDS_start + 128>();
-  constexpr auto res2 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 128, Tp::FIELDS_start + 256>();
-  constexpr auto res3 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 256, Tp::FIELDS_start + 384>();
-  constexpr auto res4 = GetAllFields2Impl<Tp, Tp::FIELDS_start + 384, Tp::FIELDS_start + 512>();
+  constexpr size_t round_num = LITE_PROTO_SCAN_FIELD_RANGE_ / 4;
+  constexpr auto res1 = GetAllFields2Impl<Tp, Tp::FIELDS_start, Tp::FIELDS_start + round_num>();
+  constexpr auto res2 = GetAllFields2Impl<Tp, Tp::FIELDS_start + round_num, Tp::FIELDS_start + round_num * 2>();
+  constexpr auto res3 = GetAllFields2Impl<Tp, Tp::FIELDS_start + round_num * 2, Tp::FIELDS_start + round_num * 3>();
+  constexpr auto res4 = GetAllFields2Impl<Tp, Tp::FIELDS_start + round_num * 3, Tp::FIELDS_start + round_num * 4>();
   constexpr auto concat1 =
       ConcatSTDArray(std::make_index_sequence<res1.size()>{}, std::make_index_sequence<res2.size()>{}, res1, res2);
   constexpr auto concat2 =
@@ -135,5 +144,6 @@ constexpr decltype(auto) GetAllFields2() {
                                                std::make_index_sequence<concat2.size()>{}, concat1, concat2);
   return SortSTDArray(std::make_index_sequence<concat_final.size()>{}, concat_final);
 }
+}  // namespace internal
 
 }  // namespace liteproto
