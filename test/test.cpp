@@ -17,46 +17,13 @@
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
 
-void IterateObject(const liteproto::Object& obj) {
-  using namespace liteproto;
-  auto descriptor = obj.Descriptor();
-  if (descriptor.KindEnum() == Kind::LIST) {
-    descriptor = descriptor.ValueType();
-    if (descriptor.TypeEnum() == Type::INT32) {
-      assert(descriptor.KindEnum() == Kind::SCALAR);
-      auto list = ListCast<int32_t>(obj);
-      if (!list.has_value()) {
-        return;
-      }
-      for (int i = 0; i < 10; i++) {
-        list->push_back(i);
-      }
-    } else if (descriptor.IsIndirectType()) {
-      if (descriptor.KindEnum() == Kind::LIST) {
-        auto list = ListCast<Object>(obj);
-        if (!list.has_value()) {
-          return;
-        }
-        for (int i = 0; i < 5; i++) {
-          auto [new_obj, data] = descriptor.DefaultValue();
-          if (new_obj.empty()) {
-            return;
-          }
-          list->push_back(new_obj);
-          IterateObject((*list)[list->size() - 1]);
-        }
-      }
-    }
-  }
-}
-
 TEST(TestList, Basic) {
   using namespace liteproto;
   std::deque<int> de;
   auto list = AsList(&de);
   list.resize(10);
   for (auto it = list.begin(); it != list.end(); it++) {
-    *it = 123;
+    (*it).SetInt64(123);
   }
   EXPECT_EQ(de.size(), 10);
   for (auto i : de) {
@@ -173,6 +140,31 @@ TEST(TestString, basic) {
   EXPECT_STRCASEEQ(str.data(), "123456789");
 }
 
+void IterateObject(const liteproto::Object& obj) {
+  using namespace liteproto;
+  auto descriptor = obj.Descriptor();
+  if (descriptor.KindEnum() == Kind::LIST) {
+    descriptor = descriptor.ValueType();
+    if (obj.IsList<Number, ConstOption::NON_CONST>()) {
+      EXPECT_EQ(descriptor.KindEnum(), Kind::SCALAR);
+      auto list = ListCast<Number>(obj);
+      ASSERT_TRUE(list.has_value());
+      for (int i = 0; i < 10; i++) {
+        list->push_back(i);
+      }
+    } else if (obj.IsList<Object, ConstOption::NON_CONST>()) {
+      auto list = ListCast<Object>(obj);
+      ASSERT_TRUE(list.has_value());
+      for (int i = 0; i < 5; i++) {
+        auto [new_obj, data] = descriptor.DefaultValue();
+        ASSERT_FALSE(new_obj.empty());
+        list->push_back(new_obj);
+        IterateObject((*list)[list->size() - 1]);
+      }
+    }
+  }
+}
+
 TEST(TestReflection, Basic) {
   using namespace liteproto;
   std::vector<int> one_dimension;
@@ -223,9 +215,12 @@ TEST(TestMsgFundamenal, basic) {
   auto& names = decltype(msg)::FieldsName();
   for (auto& [i, name] : names) {
     EXPECT_TRUE(i == 1 || i == 2 || i == 3);
-    if (i == 1) EXPECT_EQ(name, "foo");
-    if (i == 2) EXPECT_EQ(name, "bar");
-    if (i == 3) EXPECT_EQ(name, "baz");
+    if (i == 1)
+      EXPECT_EQ(name, "foo");
+    else if (i == 2)
+      EXPECT_EQ(name, "bar");
+    else if (i == 3)
+      EXPECT_EQ(name, "baz");
   }
 }
 

@@ -31,6 +31,7 @@ class List<Tp, ConstOption::NON_CONST> {
 
  public:
   using iterator = Iterator<Tp>;
+  using value_type = Tp;
 
   void push_back(const Tp& v) const { interface_.push_back(obj_, v); }
   void push_back(Tp&& v) const { interface_.emplace_back(obj_, std::move(v)); }
@@ -81,6 +82,7 @@ class List<Tp, ConstOption::CONST> {
   bool empty() const noexcept { return interface_.empty(obj_); }
 
   using iterator = std::conditional_t<std::is_same_v<Tp, Object>, Iterator<Tp>, Iterator<const Tp>>;
+  using value_type = Tp;
 
   decltype(auto) begin() const noexcept { return interface_.begin(obj_); }
   decltype(auto) end() const noexcept { return interface_.end(obj_); }
@@ -147,14 +149,16 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   static constexpr bool is_indirect = IsIndirectTypeV<typename list_traits::value_type>;
 
   using container_type = typename list_traits::container_type;
-  using value_type = std::conditional_t<is_indirect, Object, typename list_traits::value_type>;
+  //  using value_type = std::conditional_t<is_indirect, Object, typename list_traits::value_type>;
+  using value_type = typename ProxyType<typename list_traits::value_type>::type;
   using underlying_value_type = typename list_traits::value_type;
   using iterator = typename List<value_type, static_cast<ConstOption>(std::is_const_v<container_type>)>::iterator;
   using iterator_value_type = typename iterator::value_type;
   using iterator_reference = typename iterator::reference;
   using iterator_adapter = IteratorAdapter<container_type, iterator_value_type>;
   // There is no ListAdapter<const Object>;
-  using maybe_const_adapter = std::conditional_t<is_indirect, ListAdapter, ListAdapter<const Tp, void>>;
+  using maybe_const_adapter =
+      std::conditional_t<std::is_same_v<value_type, Object>, ListAdapter, ListAdapter<const Tp, void>>;
 
   explicit ListAdapter(container_type* c) noexcept : container_(c) {
     static_assert(std::is_copy_constructible_v<ListAdapter>);
@@ -165,16 +169,26 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   template <class Value>
   void push_back(Value&& v) const {
-    // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<container_type>) {
-      if constexpr (!std::is_same_v<value_type, Object>) {
-        container_->push_back(std::forward<Value>(v));
-      } else {
+    if constexpr (std::is_const_v<container_type>) {
+      // If the container is const, do nothing. And it's assured that this method will never be called.
+    } else {
+      if constexpr (std::is_same_v<value_type, Object>) {
         auto v_ptr = ObjectCast<underlying_value_type>(v);
         if (v_ptr != nullptr) {
           // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
           container_->push_back(std::move(*v_ptr));
         }
+      } else if constexpr (std::is_same_v<value_type, Number>) {
+        static_assert(std::is_same_v<std::remove_cv_t<std::remove_reference_t<Value>>, Number>);
+        if (v.IsSignedInteger()) {
+          container_->push_back(v.AsInt64());
+        } else if (v.IsUnsigned()) {
+          container_->push_back(v.AsUInt64());
+        } else {
+          container_->push_back(v.AsFloat64());
+        }
+      } else {
+        container_->push_back(std::forward<Value>(v));
       }
     }
   }
@@ -191,10 +205,10 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
     using std::begin;
     auto it = begin(*container_);
     std::advance(it, pos);
-    if constexpr (!std::is_same_v<value_type, Object>) {
-      return *it;
-    } else {
+    if constexpr (std::is_same_v<value_type, Object>) {
       return GetReflection(&(*it));
+    } else {
+      return *it;
     }
   }
 
@@ -206,15 +220,24 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   }
 
   void resize(size_t count, const value_type& v) const {
-    // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<container_type>) {
-      if constexpr (!std::is_same_v<value_type, Object>) {
-        container_->resize(count, v);
-      } else {
+    if constexpr (std::is_const_v<container_type>) {
+      // If the container is const, do nothing. And it's assured that this method will never be called.
+    } else {
+      if constexpr (std::is_same_v<value_type, Object>) {
         auto v_ptr = ObjectCast<underlying_value_type>(v);
         if (v_ptr != nullptr) {
           container_->resize(count, *v_ptr);
         }
+      } else if constexpr (std::is_same_v<value_type, Number>) {
+        if (v.IsSignedInteger()) {
+          container_->resize(count, v.AsInt64());
+        } else if (v.IsUnsigned()) {
+          container_->resize(count, v.AsUInt64());
+        } else {
+          container_->resize(count, v.AsFloat64());
+        }
+      } else {
+        container_->resize(count, v);
       }
     }
   }
@@ -239,22 +262,31 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   }
 
   iterator insert(iterator pos, const value_type& v) const {
-    // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<container_type>) {
+    if constexpr (std::is_const_v<container_type>) {
+      // If the container is const, do nothing. And it's assured that this method will never be called.
+    } else {
       auto& any_iter = internal::GetIteratorAdapter(pos);
       auto rhs_it = std::any_cast<iterator_adapter>(&any_iter);
       if (rhs_it == nullptr) {
         return end();
       }
-      if constexpr (!std::is_same_v<value_type, Object>) {
-        rhs_it->InsertMyself(container_, v);
-        return pos;
-      } else {
+      if constexpr (std::is_same_v<value_type, Object>) {
         auto v_ptr = ObjectCast<underlying_value_type>(v);
         if (v_ptr != nullptr) {
           // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
           rhs_it->InsertMyself(container_, std::move(*v_ptr));
         }
+      } else if constexpr (std::is_same_v<value_type, Number>) {
+        if (v.IsSignedInteger()) {
+          rhs_it->InsertMyself(container_, v.AsInt64());
+        } else if (v.IsUnsigned()) {
+          rhs_it->InsertMyself(container_, v.AsUInt64());
+        } else {
+          rhs_it->InsertMyself(container_, v.AsFloat64());
+        }
+      } else {
+        rhs_it->InsertMyself(container_, v);
+        return pos;
       }
     }
     return end();

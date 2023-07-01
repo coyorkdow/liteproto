@@ -53,7 +53,7 @@ class Object {
   [[nodiscard]] std::string Memory() const {
     std::string str;
     if (addr_) {
-      size_t size = descriptor_.SizeOf();
+      size_t size = descriptor_->SizeOf();
       str.append(static_cast<const char*>(addr_), size);
     }
     return str;
@@ -61,7 +61,7 @@ class Object {
 
   [[nodiscard]] const std::any& Value() const noexcept { return ptr_to_value_; }
   [[nodiscard]] bool empty() const noexcept { return addr_ == nullptr; }
-  [[nodiscard]] const TypeDescriptor& Descriptor() const noexcept { return descriptor_; }
+  [[nodiscard]] const TypeDescriptor& Descriptor() const noexcept { return *descriptor_; }
 
   Object() noexcept : descriptor_(), addr_(nullptr) {}
   Object(const Object&) = default;
@@ -82,19 +82,31 @@ class Object {
     return *this;
   }
 
+  template <class Tp, ConstOption Opt>
+  [[nodiscard]] bool IsList() const noexcept {
+    auto ptr = std::any_cast<List<Tp, Opt>>(&interface_);
+    return ptr != nullptr;
+  }
+
+  template <ConstOption Opt>
+  [[nodiscard]] bool IsString() const noexcept {
+    auto ptr = std::any_cast<String<Opt>>(&interface_);
+    return ptr != nullptr;
+  }
+
  private:
   template <class Tp, class Interface>
   Object(Tp* value_ptr, Interface interface) noexcept
-      : descriptor_(TypeMeta<Tp>::MakeDescriptor()),
+      : descriptor_(&TypeMeta<Tp>::GetDescriptor()),
         ptr_to_value_(value_ptr),
         interface_(std::move(interface)),
         addr_(value_ptr) {}
 
   template <class Tp, class = std::enable_if_t<std::is_scalar_v<Tp>>>
   explicit Object(Tp* value_ptr) noexcept
-      : descriptor_(TypeMeta<Tp>::MakeDescriptor()), ptr_to_value_(value_ptr), addr_(value_ptr) {}
+      : descriptor_(&TypeMeta<Tp>::GetDescriptor()), ptr_to_value_(value_ptr), addr_(value_ptr) {}
 
-  TypeDescriptor descriptor_;
+  const TypeDescriptor* descriptor_;
   std::any ptr_to_value_;
   std::any interface_;
   const void* addr_;

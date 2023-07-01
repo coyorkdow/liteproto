@@ -250,7 +250,7 @@ struct IsPair<Pair, std::void_t<typename PairTraits<Pair>::value_type>> : std::t
 template <class Pair>
 inline constexpr bool IsPairV = IsPair<Pair>::value;
 
-template <class Tp>
+template <class Tp, class = void>
 struct IsIndirectType : std::true_type {};
 
 template <>  // Object is indirect. We have to make is indirect so that our definition can be well-formed.
@@ -277,35 +277,9 @@ struct IsIndirectType<Tp&> : IsIndirectType<Tp> {};
 template <class Tp>
 struct IsIndirectType<Tp&&> : IsIndirectType<Tp> {};
 
-template <>
-struct IsIndirectType<bool> : std::false_type {};
-
-template <>
-struct IsIndirectType<char> : std::false_type {};
-
-template <>
-struct IsIndirectType<uint8_t> : std::false_type {};
-
-template <>
-struct IsIndirectType<int8_t> : std::false_type {};
-
-template <>
-struct IsIndirectType<uint32_t> : std::false_type {};
-
-template <>
-struct IsIndirectType<int32_t> : std::false_type {};
-
-template <>
-struct IsIndirectType<uint64_t> : std::false_type {};
-
-template <>
-struct IsIndirectType<int64_t> : std::false_type {};
-
-template <>
-struct IsIndirectType<float> : std::false_type {};
-
-template <>
-struct IsIndirectType<double> : std::false_type {};
+template <class Tp>
+struct IsIndirectType<Tp, std::enable_if_t<!std::is_const_v<Tp> && !std::is_volatile_v<Tp> && std::is_arithmetic_v<Tp>>>
+    : std::false_type {};
 
 template <class Tp>
 inline constexpr bool IsIndirectTypeV = IsIndirectType<Tp>::value;

@@ -7,6 +7,7 @@
 #include <any>
 #include <type_traits>
 
+#include "liteproto/reflect/number.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
 
@@ -17,6 +18,30 @@ class Iterator;
 
 namespace internal {
 
+template <class Tp, class = void>
+struct ReferenceType {
+  using type = Tp&;
+};
+
+template <>
+struct ReferenceType<Object> {
+  using type = Object;
+};
+
+template <>
+struct ReferenceType<Number> {
+  using type = NumberReference<ConstOption::NON_CONST>;
+};
+
+template <>
+struct ReferenceType<const Number> {
+  using type = NumberReference<ConstOption::CONST>;
+};
+
+template <class Tp>
+inline constexpr bool is_proxy_type_v =
+    std::is_same_v<Tp, Object> || std::is_same_v<Tp, Number> || std::is_same_v<Tp, const Number>;
+
 template <class Container, class Tp>
 class IteratorAdapter;
 
@@ -24,7 +49,7 @@ template <class Tp>
 struct IteratorInterface {
  public:
   using pointer = Tp*;
-  using reference_or_value = std::conditional_t<std::is_same_v<Tp, Object>, Tp, Tp&>;
+  using reference_or_value = typename ReferenceType<Tp>::type;
 
   using indirection_t = reference_or_value(const std::any&) noexcept;
   using member_of_object_t = pointer(const std::any&) noexcept;
@@ -42,7 +67,7 @@ struct IteratorInterface {
 };
 
 template <class IteratorAdapter, class Tp>
-Iterator<Tp> MakeIterator(IteratorAdapter&& it, internal::IteratorInterface<Tp> inter);
+Iterator<Tp> MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp>& inter);
 
 template <class Tp_>
 std::any& GetIteratorAdapter(Iterator<Tp_>&) noexcept;
@@ -63,11 +88,10 @@ class IteratorBase {
   using reference = typename internal::IteratorInterface<Tp>::reference_or_value;
   using iterator_category = std::bidirectional_iterator_tag;
 
-  reference operator*() noexcept { return interface_.indirection(it_); }
-  //  pointer operator->() noexcept { return interface_.member_of_object(it_); }
+  reference operator*() noexcept { return interface_->indirection(it_); }
 
   iterator& operator++() {
-    interface_.increment(it_);
+    interface_->increment(it_);
     return static_cast<iterator&>(*this);
   }
   iterator operator++(int) {
@@ -77,7 +101,7 @@ class IteratorBase {
   }
 
   iterator& operator--() {
-    interface_.decrement(it_);
+    interface_->decrement(it_);
     return static_cast<iterator&>(*this);
   }
   iterator operator--(int) {
@@ -86,7 +110,7 @@ class IteratorBase {
     return old;
   }
 
-  [[nodiscard]] uint64_t AdapterTypeId() const noexcept { return interface_.adapter_type_id(it_); }
+  [[nodiscard]] uint64_t AdapterTypeId() const noexcept { return interface_->adapter_type_id(it_); }
 
   IteratorBase() = default;
   IteratorBase(const IteratorBase&) = default;
@@ -97,20 +121,20 @@ class IteratorBase {
  protected:
   template <class ItAdapter>
   IteratorBase(ItAdapter&& it, const internal::IteratorInterface<Tp>& inter)
-      : it_(std::forward<ItAdapter>(it)), interface_(inter) {
+      : it_(std::forward<ItAdapter>(it)), interface_(&inter) {
     static_assert(std::is_copy_constructible<IteratorBase>::value);
     static_assert(std::is_copy_assignable<IteratorBase>::value);
     static_assert(std::is_swappable<IteratorBase>::value);
   }
 
   std::any it_;
-  internal::IteratorInterface<Tp> interface_;
+  const internal::IteratorInterface<Tp>* interface_;
 };
 
 template <class Tp>
 class Iterator : public IteratorBase<Tp> {
   template <class IteratorAdapter, class Tp_>
-  friend Iterator<Tp_> internal::MakeIterator(IteratorAdapter&& it, internal::IteratorInterface<Tp_> inter);
+  friend Iterator<Tp_> internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp_>& inter);
 
   template <class Tp_>
   friend std::any& internal::GetIteratorAdapter(Iterator<Tp_>&) noexcept;
@@ -132,8 +156,8 @@ class Iterator : public IteratorBase<Tp> {
   Iterator& operator=(Iterator&&) noexcept = default;
 
   bool operator==(const Iterator& rhs) const noexcept { return !(*this != rhs); }
-  bool operator!=(const Iterator& rhs) const noexcept { return base::interface_.noteq(base::it_, rhs); }
-  typename base::pointer operator->() noexcept { return base::interface_.member_of_object(base::it_); }
+  bool operator!=(const Iterator& rhs) const noexcept { return base::interface_->noteq(base::it_, rhs); }
+  typename base::pointer operator->() noexcept { return base::interface_->member_of_object(base::it_); }
 
  private:
   template <class ItAdapter>
@@ -147,7 +171,7 @@ class Iterator : public IteratorBase<Tp> {
 template <>
 class Iterator<Object> : public IteratorBase<Object> {
   template <class IteratorAdapter, class Tp_>
-  friend Iterator<Tp_> internal::MakeIterator(IteratorAdapter&& it, internal::IteratorInterface<Tp_> inter);
+  friend Iterator<Tp_> internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp_>& inter);
 
   template <class Tp_>
   friend std::any& internal::GetIteratorAdapter(Iterator<Tp_>&) noexcept;
@@ -169,7 +193,7 @@ class Iterator<Object> : public IteratorBase<Object> {
   Iterator& operator=(Iterator&&) noexcept = default;
 
   bool operator==(const Iterator& rhs) const noexcept { return !(*this != rhs); }
-  bool operator!=(const Iterator& rhs) const noexcept { return base::interface_.noteq(base::it_, rhs); }
+  bool operator!=(const Iterator& rhs) const noexcept { return base::interface_->noteq(base::it_, rhs); }
 
  private:
   template <class ItAdapter>
@@ -180,10 +204,46 @@ class Iterator<Object> : public IteratorBase<Object> {
   explicit Iterator(base&& iterator) noexcept : IteratorBase<Object>(std::move(iterator)) {}
 };
 
+template <>
+class Iterator<Number> : public IteratorBase<Number> {
+  template <class IteratorAdapter, class Tp_>
+  friend Iterator<Tp_> internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp_>& inter);
+
+  template <class Tp_>
+  friend std::any& internal::GetIteratorAdapter(Iterator<Tp_>&) noexcept;
+
+  template <class Tp_>
+  friend const std::any& internal::GetIteratorAdapter(const Iterator<Tp_>&) noexcept;
+
+  template <class Container, class Tp_>
+  friend class internal::IteratorAdapter;
+
+  friend class IteratorBase<Number>;
+  using base = IteratorBase<Number>;
+
+ public:
+  Iterator() = default;
+  Iterator(const Iterator&) = default;
+  Iterator(Iterator&&) noexcept = default;
+  Iterator& operator=(const Iterator&) = default;
+  Iterator& operator=(Iterator&&) noexcept = default;
+
+  bool operator==(const Iterator& rhs) const noexcept { return !(*this != rhs); }
+  bool operator!=(const Iterator& rhs) const noexcept { return base::interface_->noteq(base::it_, rhs); }
+
+ private:
+  template <class ItAdapter>
+  Iterator(ItAdapter&& it, const internal::IteratorInterface<Number>& inter)
+      : IteratorBase<Number>(std::forward<ItAdapter>(it), inter) {}
+
+  explicit Iterator(const base& iterator) : IteratorBase<Number>(iterator) {}
+  explicit Iterator(base&& iterator) noexcept : IteratorBase<Number>(std::move(iterator)) {}
+};
+
 namespace internal {
 
 template <class IteratorAdapter, class Tp>
-Iterator<Tp> MakeIterator(IteratorAdapter&& it, IteratorInterface<Tp> inter) {
+Iterator<Tp> MakeIterator(IteratorAdapter&& it, const IteratorInterface<Tp>& inter) {
   return Iterator<Tp>(std::forward<IteratorAdapter>(it), inter);
 }
 
@@ -241,17 +301,20 @@ struct IteratorInterfaceImpl {
 };
 
 template <class It>
-auto MakeIteratorInterface() noexcept {
+const IteratorInterface<typename It::value_type>& MakeIteratorInterface() noexcept {
   using value_type = typename It::value_type;
   using impl = IteratorInterfaceImpl<It, value_type>;
-  IteratorInterface<value_type> interface {};
-  interface.indirection = &impl::Indirection;
-  interface.member_of_object = &impl::MemberOfObject;
-  interface.increment = &impl::Increment;
-  interface.decrement = &impl::Decrement;
-  interface.noteq = &impl::NotEq;
-  interface.adapter_type_id = &impl::AdapterTypeId;
-  return interface;
+  static const IteratorInterface<value_type> inter = [&] {
+    IteratorInterface<value_type> interface {};
+    interface.indirection = &impl::Indirection;
+    interface.member_of_object = &impl::MemberOfObject;
+    interface.increment = &impl::Increment;
+    interface.decrement = &impl::Decrement;
+    interface.noteq = &impl::NotEq;
+    interface.adapter_type_id = &impl::AdapterTypeId;
+    return interface;
+  }();
+  return inter;
 }
 
 template <class Container, class Tp>
@@ -271,16 +334,15 @@ class IteratorAdapter {
   // We don't store any additional data in the adapter. Instead, the Object returned by adapter is created when the
   // corresponding method is called. Therefore, the return type of indirection operator is value type, not
   // reference_or_value type.
-  static_assert(std::is_same_v<value_type, Object> || std::is_reference_v<reference_or_value>,
-                "IteratorAdapter uses reference_or_value for all types except Object");
+  static_assert(is_proxy_type_v<value_type> || std::is_reference_v<reference_or_value>,
+                "IteratorAdapter uses reference_or_value for all types except Object or Number");
   using container_type = Container;
   using wrapped_iterator = std::conditional_t<std::is_const_v<container_type>, typename container_type::const_iterator,
                                               typename container_type::iterator>;
 
  public:
   explicit IteratorAdapter(const wrapped_iterator& it) noexcept : it_(it) {
-    static_assert(std::is_same_v<Object, value_type> ||
-                  std::is_same_v<value_type, typename container_type::value_type> ||
+    static_assert(is_proxy_type_v<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
                   std::is_same_v<value_type, const typename container_type::value_type>);
     static_assert(std::is_copy_constructible<IteratorAdapter>::value);
     static_assert(std::is_copy_assignable<IteratorAdapter>::value);
@@ -288,18 +350,19 @@ class IteratorAdapter {
   }
 
   reference_or_value operator*() const {
-    if constexpr (!std::is_same_v<value_type, Object>) {
-      return *it_;
-    } else {
+    if constexpr (std::is_same_v<value_type, Object>) {
       return GetReflection(&(*it_));
+    } else {
+      // number can implicitly convert to NumberReference
+      return *it_;
     }
   }
 
   pointer operator->() const {
-    if constexpr (!std::is_same_v<value_type, Object>) {
+    if constexpr (!is_proxy_type_v<value_type>) {
       return it_.operator->();
     } else {
-      // If the value_type is Object, do nothing. And it's assured that this method will never be called.
+      // If the value_type is Object or Number, do nothing. And it's assured that this method will never be called.
       return nullptr;
     }
   }

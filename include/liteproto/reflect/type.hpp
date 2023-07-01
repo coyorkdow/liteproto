@@ -182,6 +182,7 @@ enum class transform : uint8_t {
   remove_pointer,
   remove_extent,
   remove_all_extents,
+  underlying_type
 };
 
 class TypeDescriptor;
@@ -193,13 +194,13 @@ struct DescriptorInterface {
   using kinde_enum_t = Kind() noexcept;
   using type_enum_t = Type() noexcept;
   using traits_t = bool(traits) noexcept;
-  using transform_t = TypeDescriptor(transform) noexcept;
+  using transform_t = const TypeDescriptor&(transform) noexcept;
   using size_of_t = size_t() noexcept;
   using alignment_of_t = size_t() noexcept;
   using rank_t = size_t() noexcept;
   using extent_t = size_t() noexcept;
 
-  using value_type_t = TypeDescriptor() noexcept;
+  using value_type_t = const TypeDescriptor&() noexcept;
 
   using is_indirect_type_t = bool() noexcept;
   using default_value = std::pair<Object, std::any>() noexcept;
@@ -257,7 +258,7 @@ class TypeDescriptor {
 
 template <class Tp>
 struct TypeMeta {
-  static inline TypeDescriptor MakeDescriptor() noexcept;
+  static inline const TypeDescriptor& GetDescriptor() noexcept;
   static inline std::pair<Object, std::any> DefaultValue() noexcept;
 
   static constexpr bool IsIndirectType() noexcept { return IsIndirectTypeV<Tp>; }
@@ -290,7 +291,7 @@ struct TypeMeta {
   // along its first dimension and N is 0, value is 0.
   static constexpr size_t Extent() noexcept { return std::extent_v<Tp>; }
 
-  static constexpr TypeDescriptor Transform(transform t) noexcept {
+  static constexpr const TypeDescriptor& Transform(transform t) noexcept {
     switch (t) {
       case transform::remove_const:
         return remove_const();
@@ -304,36 +305,48 @@ struct TypeMeta {
         return remove_extent();
       case transform::remove_all_extents:
         return remove_all_extents();
+      case transform::underlying_type:
+        return underlying_type();
     }
-    return TypeMeta<void>::MakeDescriptor();
+    return TypeMeta<void>::GetDescriptor();
   }
 
-  static constexpr TypeDescriptor remove_const() noexcept {
+  static constexpr decltype(auto) remove_const() noexcept {
     using next_meta = TypeMeta<std::remove_const_t<Tp>>;
-    return next_meta::MakeDescriptor();
+    return next_meta::GetDescriptor();
   }
-  static constexpr TypeDescriptor remove_volatile() noexcept {
+  static constexpr decltype(auto) remove_volatile() noexcept {
     using next_meta = TypeMeta<std::remove_volatile_t<Tp>>;
-    return next_meta::MakeDescriptor();
+    return next_meta::GetDescriptor();
   }
-  static constexpr TypeDescriptor remove_reference() noexcept {
+  static constexpr decltype(auto) remove_reference() noexcept {
     using next_meta = TypeMeta<std::remove_reference_t<Tp>>;
-    return next_meta::MakeDescriptor();
+    return next_meta::GetDescriptor();
   }
-  static constexpr TypeDescriptor remove_pointer() noexcept {
+  static constexpr decltype(auto) remove_pointer() noexcept {
     using next_meta = TypeMeta<std::remove_pointer_t<Tp>>;
-    return next_meta::MakeDescriptor();
+    return next_meta::GetDescriptor();
   }
-  static constexpr TypeDescriptor remove_extent() noexcept {
+  static constexpr decltype(auto) remove_extent() noexcept {
     using next_meta = TypeMeta<std::remove_extent_t<Tp>>;
-    return next_meta::MakeDescriptor();
+    return next_meta::GetDescriptor();
   }
-  static constexpr TypeDescriptor remove_all_extents() noexcept {
+  static constexpr decltype(auto) remove_all_extents() noexcept {
     using next_meta = TypeMeta<std::remove_all_extents_t<Tp>>;
-    return next_meta::MakeDescriptor();
+    return next_meta::GetDescriptor();
+  }
+  static constexpr decltype(auto) underlying_type() noexcept {
+    // If T is a complete enumeration (enum) type, provides a member typedef type that names the underlying type of T.
+    // Otherwise, the behavior is undefined. (before c++20)
+    if constexpr (std::is_enum_v<Tp>) {
+      using next_meta = TypeMeta<std::underlying_type_t<Tp>>;
+      return next_meta::GetDescriptor();
+    } else {
+      return GetDescriptor();
+    }
   }
 
-  static constexpr TypeDescriptor ValueType() noexcept {
+  static constexpr const TypeDescriptor& ValueType() noexcept {
     if constexpr (std::is_pointer_v<Tp>) {
       return remove_pointer();
     } else if constexpr (std::is_reference_v<Tp>) {
@@ -341,19 +354,19 @@ struct TypeMeta {
     } else if constexpr (std::is_array_v<Tp>) {
       return remove_extent();
     } else if constexpr (IsSmartPtrV<Tp>) {
-      return TypeMeta<typename SmartPtrTraits<Tp>::value_type>::MakeDescriptor();
+      return TypeMeta<typename SmartPtrTraits<Tp>::value_type>::GetDescriptor();
     } else if constexpr (IsListV<Tp>) {
       using traits = ListTraits<Tp>;
-      return TypeMeta<typename traits::value_type>::MakeDescriptor();
+      return TypeMeta<typename traits::value_type>::GetDescriptor();
     } else if constexpr (IsArrayV<Tp>) {
       using traits = ArrayTraits<Tp>;
-      return TypeMeta<typename traits::value_type>::MakeDescriptor();
+      return TypeMeta<typename traits::value_type>::GetDescriptor();
     } else if constexpr (IsPairV<Tp>) {
       using traits = PairTraits<Tp>;
-      return TypeMeta<typename traits::value_type>::MakeDescriptor();
+      return TypeMeta<typename traits::value_type>::GetDescriptor();
     }
 
-    return TypeMeta<void>::MakeDescriptor();
+    return TypeMeta<void>::GetDescriptor();
   }
 
   static constexpr Kind KindEnum() noexcept {
@@ -505,6 +518,8 @@ struct TypeMeta {
     return true;
   }
 };
+
+inline const TypeDescriptor void_descriptor = TypeMeta<void>::GetDescriptor();
 
 enum class ConstOption : bool { NON_CONST = false, CONST = true };
 

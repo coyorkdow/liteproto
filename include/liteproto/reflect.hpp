@@ -7,6 +7,7 @@
 #include "liteproto/list.hpp"
 #include "liteproto/message.hpp"
 #include "liteproto/pair.hpp"
+#include "liteproto/reflect/number.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
 #include "liteproto/string.hpp"
@@ -42,24 +43,29 @@ inline std::pair<Object, std::any> TypeMeta<Tp>::DefaultValue() noexcept {
 }
 
 template <class Tp>
-inline TypeDescriptor TypeMeta<Tp>::MakeDescriptor() noexcept {
-  internal::DescriptorInterface inter{};
-  inter.id_ = &Id;
-  inter.size_of_ = &SizeOf;
-  inter.alignment_of_ = &AlignmentOf;
-  inter.rank_ = &Rank;
-  inter.extent_ = &Extent;
-  inter.transform_ = &Transform;
-  inter.type_enum_ = &TypeEnum;
-  inter.kind_enum_ = &KindEnum;
-  inter.traits_ = &Traits;
-  inter.transform_ = &Transform;
+inline const TypeDescriptor& TypeMeta<Tp>::GetDescriptor() noexcept {
+  static const TypeDescriptor descriptor = [&] {
+    internal::DescriptorInterface inter{};
+    inter.id_ = &Id;
+    inter.size_of_ = &SizeOf;
+    inter.alignment_of_ = &AlignmentOf;
+    inter.rank_ = &Rank;
+    inter.extent_ = &Extent;
+    inter.transform_ = &Transform;
+    inter.type_enum_ = &TypeEnum;
+    inter.kind_enum_ = &KindEnum;
+    inter.traits_ = &Traits;
+    inter.transform_ = &Transform;
 
-  inter.value_type_ = &ValueType;
-  inter.is_indirect_type_ = &IsIndirectType;
-  inter.default_value_ = &DefaultValue;
-  return TypeDescriptor{inter};
+    inter.value_type_ = &ValueType;
+    inter.is_indirect_type_ = &IsIndirectType;
+    inter.default_value_ = &DefaultValue;
+    return TypeDescriptor{inter};
+  }();
+  return descriptor;
 }
+
+//template <class Tp, ConstOption Opt>
 
 template <class Tp, ConstOption Opt>
 std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept {
