@@ -6,6 +6,7 @@
 
 #include "liteproto/message.hpp"
 #include "liteproto/reflect.hpp"
+#include "liteproto/serialize/resolver.hpp"
 
 #define MESSAGE(msg_name) class msg_name : public liteproto::MessageBase<msg_name, __LINE__>
 

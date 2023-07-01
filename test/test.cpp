@@ -12,6 +12,10 @@
 #include "liteproto/liteproto.hpp"
 #include "liteproto/static_test/static_test.hpp"
 #include "nameof.hpp"
+#include "rapidjson/document.h"
+#include "rapidjson/prettywriter.h"
+#include "rapidjson/stringbuffer.h"
+#include "rapidjson/writer.h"
 
 void IterateObject(const liteproto::Object& obj) {
   using namespace liteproto;
@@ -223,4 +227,18 @@ TEST(TestMsgFundamenal, basic) {
     if (i == 2) EXPECT_EQ(name, "bar");
     if (i == 3) EXPECT_EQ(name, "baz");
   }
+}
+
+TEST(Test3rd, RapidJson) {
+  using namespace rapidjson;
+  Document document;
+  auto& value = document.SetObject();
+  value.AddMember("foo", 1, document.GetAllocator());
+  value.AddMember("bar", 2, document.GetAllocator());
+  EXPECT_TRUE(document.HasMember("foo"));
+  EXPECT_TRUE(document.HasMember("bar"));
+  StringBuffer buffer;
+  PrettyWriter<StringBuffer> writer(buffer);
+  document.Accept(writer);
+  std::cout << buffer.GetString();
 }

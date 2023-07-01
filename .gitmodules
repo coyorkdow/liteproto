@@ -4,3 +4,6 @@
 [submodule "thirdparty/nameof"]
 	path = thirdparty/nameof
 	url = https://github.com/Neargye/nameof.git
+[submodule "thirdparty/rapidjson"]
+	path = thirdparty/rapidjson
+	url = https://github.com/Tencent/rapidjson.git

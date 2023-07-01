@@ -21,6 +21,7 @@ add_library(liteproto STATIC src/liteproto.cpp)
 
 target_include_directories(liteproto PUBLIC include)
 target_include_directories(liteproto PUBLIC thirdparty/nameof/include)
+target_include_directories(liteproto PUBLIC thirdparty/rapidjson/include)
 #target_compile_definitions(liteproto PUBLIC LITE_PROTO_DISABLE_COMPATIBLE_MODE_)
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
