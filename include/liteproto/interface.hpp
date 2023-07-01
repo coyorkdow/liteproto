@@ -58,12 +58,21 @@ struct ListInterface {
   to_const_t* to_const;
 };
 
-struct StringInterface : ListInterface<char> {
-  using c_str_t = const char*(const std::any&);
-  using append_t = void(const std::any&, const char*, std::size_t);
+template <class Tp>
+struct StringInterface {
+  using c_str_t = const Tp*(const std::any&) noexcept;
+  using append_t = void(const std::any&, const Tp*, std::size_t);
+  using data_t = Tp*(const std::any&) noexcept;
+
+  using const_interface_t = StringInterface<const Tp>() noexcept;
+  using to_const_t = std::any(const std::any&) noexcept;
 
   c_str_t* c_str;
   append_t* append;
+  data_t* data;
+
+  const_interface_t* const_interface;
+  to_const_t* to_const;
 };
 
 template <class Car, class Cdr>
@@ -180,7 +189,14 @@ struct ListInterfaceImpl {
   }
   static_assert(std::is_same_v<decltype(end), typename base::end_t>);
 
-  static ListInterface<typename base::maybe_const> ConstInterface() noexcept;
+  static ListInterface<typename base::maybe_const> ConstInterface() noexcept {
+    using const_adapter = typename Adapter::maybe_const_adapter;
+    using iterator_value_type = typename const_adapter::iterator_value_type;
+    using impl = ListInterfaceImpl<const_adapter, iterator_value_type>;
+    ListInterface<iterator_value_type> interface {};
+    impl::MakeInterface(&interface);
+    return interface;
+  }
   static_assert(std::is_same_v<decltype(ConstInterface), typename base::const_interface_t>);
 
   static std::any ToConst(const std::any& obj) noexcept {
@@ -188,23 +204,74 @@ struct ListInterfaceImpl {
     return (*ptr).ToConst();
   }
   static_assert(std::is_same_v<decltype(ToConst), typename base::to_const_t>);
+
+  static void MakeInterface(base* interface) noexcept {
+    interface->push_back = &push_back;
+    interface->emplace_back = &emplace_back;
+    interface->pop_back = &pop_back;
+    interface->insert = &insert;
+    interface->emplace_insert = &emplace_insert;
+    interface->erase = &erase;
+    interface->operator_subscript = &operator_subscript;
+    interface->size = &size;
+    interface->resize = &resize;
+    interface->resize_append = &resize_append;
+    interface->empty = &empty;
+    interface->clear = &clear;
+    interface->begin = &begin;
+    interface->end = &end;
+    interface->const_interface = &ConstInterface;
+    interface->to_const = &ToConst;
+  }
 };
 
-template <class Str>
-struct StringInterfaceImpl : ListInterfaceImpl<Str, char> {
-  using base = StringInterface;
+template <class Adapter, class Tp>
+struct StringInterfaceImpl {
+  using base = StringInterface<Tp>;
 
-  static const char* c_str(const std::any& obj) noexcept {
-    auto* ptr = std::any_cast<Str>(&obj);
+  static const Tp* c_str(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr).c_str();
   }
   static_assert(std::is_same_v<decltype(c_str), typename base::c_str_t>);
 
-  static void append(const std::any& obj, const char* cstr, size_t n) {
-    auto* ptr = std::any_cast<Str>(&obj);
+  static void append(const std::any& obj, const Tp* cstr, size_t n) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
     return (*ptr).append(cstr, n);
   }
   static_assert(std::is_same_v<decltype(append), typename base::append_t>);
+
+  static Tp* data(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).data();
+  }
+  static_assert(std::is_same_v<decltype(data), typename base::data_t>);
+
+  static StringInterface<const Tp> ConstInterface() noexcept {
+    using const_adapter = typename Adapter::const_adapter;
+    using iterator_value_type = typename const_adapter::iterator_value_type;
+    static_assert(std::is_same_v<const Tp, iterator_value_type>);
+    using impl = StringInterfaceImpl<const_adapter, iterator_value_type>;
+    StringInterface<iterator_value_type> interface {};
+    impl::MakeInterface(&interface);
+    return interface;
+  }
+  static_assert(std::is_same_v<decltype(ConstInterface), typename base::const_interface_t>);
+
+  static std::any ToConst(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).ToConst();
+  }
+  static_assert(std::is_same_v<decltype(ToConst), typename base::to_const_t>);
+
+  static void MakeInterface(base* interface) noexcept {
+    interface->c_str = &c_str;
+    interface->data = &data;
+    interface->append = &append;
+
+    interface->const_interface = &ConstInterface;
+    interface->to_const = &ToConst;
+  }
 };
 
 template <class Adapter>
@@ -212,30 +279,21 @@ auto MakeListInterface() {
   using iterator_value_type = typename Adapter::iterator_value_type;
   using impl = ListInterfaceImpl<Adapter, iterator_value_type>;
   ListInterface<iterator_value_type> interface {};
-  interface.push_back = &impl::push_back;
-  interface.emplace_back = &impl::emplace_back;
-  interface.pop_back = &impl::pop_back;
-  interface.insert = &impl::insert;
-  interface.emplace_insert = &impl::emplace_insert;
-  interface.erase = &impl::erase;
-  interface.operator_subscript = &impl::operator_subscript;
-  interface.size = &impl::size;
-  interface.resize = &impl ::resize;
-  interface.resize_append = &impl ::resize_append;
-  interface.empty = &impl::empty;
-  interface.clear = &impl::clear;
-  interface.begin = &impl::begin;
-  interface.end = &impl::end;
-
-  interface.const_interface = &impl::ConstInterface;
-  interface.to_const = &impl::ToConst;
+  impl::MakeInterface(&interface);
   return interface;
 }
 
-template <class Adapter, class Tp>
-ListInterface<typename ListInterface<Tp>::maybe_const> ListInterfaceImpl<Adapter, Tp>::ConstInterface() noexcept {
-  using const_adapter = typename Adapter::maybe_const_adapter;
-  return MakeListInterface<const_adapter>();
+template <class Adapter>
+auto MakeStringInterface() {
+  using iterator_value_type = typename Adapter::iterator_value_type;
+  using impl = StringInterfaceImpl<Adapter, iterator_value_type>;
+  using list_impl = ListInterfaceImpl<Adapter, iterator_value_type>;
+  StringInterface<iterator_value_type> interface {};
+  impl::MakeInterface(&interface);
+
+  ListInterface<iterator_value_type> list_interface{};
+  list_impl::MakeInterface(&list_interface);
+  return std::make_pair(list_interface, interface);
 }
 
 }  // namespace internal

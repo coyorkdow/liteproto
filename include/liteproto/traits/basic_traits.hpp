@@ -6,6 +6,16 @@
 
 #include <type_traits>
 
+using uint8_t = std::uint8_t;
+using int8_t = std::int8_t;
+using uint32_t = std::uint32_t;
+using int32_t = std::int32_t;
+using uint64_t = std::uint64_t;
+using int64_t = std::int64_t;
+using size_t = std::size_t;
+
+static_assert(!std::is_same_v<int8_t, char>, "liteproto requires that int8_t is a type different than char");
+
 namespace liteproto {
 
 namespace details {
@@ -80,7 +90,8 @@ auto HasAppend(float) -> std::false_type;
 
 template <class C, class V,
           class = std::enable_if_t<std::is_same_v<V*, decltype(std::declval<C&>().data())> &&
-                                   std::is_same_v<const V*, decltype(std::declval<const C&>().data())>>>
+                                   (std::is_same_v<V*, decltype(std::declval<const C&>().data())> ||
+                                    std::is_same_v<const V*, decltype(std::declval<const C&>().data())>)>>
 auto HasData(int) -> std::true_type;
 
 template <class C, class V>
@@ -93,6 +104,13 @@ auto IsForwardIterator(int) -> std::true_type;
 template <class>
 auto IsForwardIterator(float) -> std::false_type;
 
+template <class It, class = std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag,
+                                                               typename std::iterator_traits<It>::iterator_category>>>
+auto IsBidirectionalIterator(int) -> std::true_type;
+
+template <class>
+auto IsBidirectionalIterator(float) -> std::false_type;
+
 using std::begin;
 using std::end;
 
@@ -102,6 +120,13 @@ auto IsForwardIterable(int) -> decltype(IsForwardIterator<decltype(begin(std::de
 
 template <class>
 auto IsForwardIterable(float) -> std::false_type;
+
+template <class Tp, class = std::enable_if_t<
+                        std::is_same_v<decltype(begin(std::declval<Tp&>())), decltype(end(std::declval<Tp&>()))>>>
+auto IsBidirectionalIterable(int) -> decltype(IsBidirectionalIterator<decltype(begin(std::declval<Tp&>()))>(0));
+
+template <class>
+auto IsBidirectionalIterable(float) -> std::false_type;
 
 template <class C, class It = decltype(begin(std::declval<C&>())),
           class = decltype(std::declval<C&>().erase(std::declval<It>()))>
@@ -202,11 +227,23 @@ struct is_forward_iterator : decltype(details::IsForwardIterator<Tp>(0)) {};
 template <class Tp>
 inline constexpr bool is_forward_iterator_v = is_forward_iterator<Tp>::value;
 
+template <class Tp>
+struct is_bidirectional_iterator : decltype(details::IsBidirectionalIterator<Tp>(0)) {};
+
+template <class Tp>
+inline constexpr bool is_bidirectional_iterator_v = is_bidirectional_iterator<Tp>::value;
+
 template <class C>
 struct is_forward_iterable : decltype(details::IsForwardIterable<C>(0)) {};
 
 template <class C>
 inline constexpr bool is_forward_iterable_v = is_forward_iterable<C>::value;
+
+template <class C>
+struct is_bidirectional_iterable : decltype(details::IsBidirectionalIterable<C>(0)) {};
+
+template <class C>
+inline constexpr bool is_bidirectional_iterable_v = is_bidirectional_iterable<C>::value;
 
 template <class C>
 struct has_erase : decltype(details::HasErase<C>(0)) {};

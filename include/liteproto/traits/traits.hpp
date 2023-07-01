@@ -28,7 +28,7 @@ namespace internal {
 template <class C, class V>
 inline constexpr bool is_list =
     has_push_back_v<C, V> && has_pop_back_v<C> && has_size_v<C> && has_resize_v<C, V> && has_empty_v<C> &&
-    has_clear_v<C> && is_forward_iterable_v<C> && has_insert_v<C, V> && has_erase_v<C>;
+    has_clear_v<C> && is_bidirectional_iterable_v<C> && has_insert_v<C, V> && has_erase_v<C>;
 
 template <class Str, class Char>
 inline constexpr bool is_string =
@@ -37,7 +37,7 @@ inline constexpr bool is_string =
 template <class C, class V>
 inline constexpr bool is_array =
     std::is_array_v<C> ||
-    (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> && is_forward_iterable_v<C>);
+    (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> && is_bidirectional_iterable_v<C>);
 
 }  // namespace internal
 
@@ -250,8 +250,8 @@ struct IsPair<Pair, std::void_t<typename PairTraits<Pair>::value_type>> : std::t
 template <class Pair>
 inline constexpr bool IsPairV = IsPair<Pair>::value;
 
-template <class Tp>  // All Strings are direct types.
-struct IsIndirectType : std::bool_constant<!IsStringV<Tp>> {};
+template <class Tp>
+struct IsIndirectType : std::true_type {};
 
 template <>  // Object is indirect. We have to make is indirect so that our definition can be well-formed.
 struct IsIndirectType<Object> : std::true_type {};
@@ -276,6 +276,12 @@ struct IsIndirectType<Tp&> : IsIndirectType<Tp> {};
 
 template <class Tp>
 struct IsIndirectType<Tp&&> : IsIndirectType<Tp> {};
+
+template <>
+struct IsIndirectType<bool> : std::false_type {};
+
+template <>
+struct IsIndirectType<char> : std::false_type {};
 
 template <>
 struct IsIndirectType<uint8_t> : std::false_type {};

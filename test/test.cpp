@@ -12,68 +12,6 @@
 #include "liteproto/liteproto.hpp"
 #include "liteproto/static_test/static_test.hpp"
 
-TEST(TestList, basic) {
-  using namespace liteproto;
-  std::vector<std::string> strlist;
-  auto list = AsList(&strlist);
-  for (int i = 0; i < 10; i++) {
-    list.push_back(std::to_string(i));
-    EXPECT_EQ(strlist.back(), std::to_string(i));
-  }
-  EXPECT_EQ(strlist.size(), 10);
-  EXPECT_EQ(list.size(), 10);
-  for (int i = 0; i < 5; i++) {
-    list.pop_back();
-    EXPECT_EQ(list.size(), 10 - i - 1);
-  }
-  int cnt = 0;
-  for (auto& v : list) {
-    v.append("x");
-    EXPECT_EQ(list[cnt].back(), 'x');
-    cnt++;
-  }
-  EXPECT_EQ(list.size(), 5);
-  const auto& cref = strlist;
-  auto const_list = AsList(&cref);
-  for (size_t i = 0; i < const_list.size(); i++) {
-    EXPECT_EQ(const_list[i].back(), 'x');
-  }
-  cnt = 0;
-  for (auto it = const_list.begin(); it != const_list.end(); it++, cnt++) {
-    EXPECT_EQ(*it, strlist[cnt]);
-  }
-
-  Iterator<std::string> it = list.begin();
-  std::list<std::string> anol;
-  list = AsList(&anol);
-  EXPECT_TRUE(it != list.begin());
-  EXPECT_TRUE(list.begin() == list.end());
-  EXPECT_EQ(list.size(), 0);
-  EXPECT_TRUE(list.empty());
-  for (int i = 0; i < 5; i++) {
-    list.insert(list.end(), "no" + std::to_string(i));
-  }
-  cnt = 0;
-  for (auto& v : anol) {
-    EXPECT_EQ(v, "no" + std::to_string(cnt));
-    cnt++;
-  }
-  list.resize(10, "abc");
-  EXPECT_EQ(anol.size(), 10);
-  auto iter = std::next(anol.begin(), 5);
-  for (int i = 5; i < 10; i++) {
-    EXPECT_EQ(*iter, "abc");
-    iter++;
-  }
-  while (!list.empty()) {
-    it = list.erase(list.begin());
-  }
-  EXPECT_EQ(anol.size(), 0);
-  list.insert(list.begin(), "new str");
-  const_list = list;
-  EXPECT_STREQ(const_list.begin()->c_str(), "new str");
-}
-
 void IterateObject(const liteproto::Object& obj) {
   using namespace liteproto;
   auto descriptor = obj.Descriptor();
@@ -105,6 +43,129 @@ void IterateObject(const liteproto::Object& obj) {
       }
     }
   }
+}
+
+TEST(TestList, Basic) {
+  using namespace liteproto;
+  std::deque<int> de;
+  auto list = AsList(&de);
+  list.resize(10);
+  for (auto it = list.begin(); it != list.end(); it++) {
+    *it = 123;
+  }
+  EXPECT_EQ(de.size(), 10);
+  for (auto i : de) {
+    EXPECT_EQ(i, 123);
+  }
+}
+
+TEST(TestList, ListOfString) {
+  using namespace liteproto;
+  std::vector<std::string> strlist;
+  auto list = AsList(&strlist);
+  for (int i = 0; i < 10; i++) {
+    std::string si = std::to_string(i);
+    list.push_back(GetReflection(&si));
+    EXPECT_EQ(strlist.back(), std::to_string(i));
+  }
+  EXPECT_EQ(strlist.size(), 10);
+  EXPECT_EQ(list.size(), 10);
+  for (int i = 0; i < 5; i++) {
+    list.pop_back();
+    EXPECT_EQ(list.size(), 10 - i - 1);
+  }
+  int cnt = 0;
+  for (auto v : list) {
+    auto str = StringCast(v);
+    str->append("x");
+    str = StringCast(list[cnt]);
+    EXPECT_EQ((*str)[str->size() - 1], 'x');
+    std::string* p = ObjectCast<std::string>(list[cnt]);
+    EXPECT_EQ(p->back(), 'x');
+    cnt++;
+  }
+  EXPECT_EQ(list.size(), 5);
+  const auto& cref = strlist;
+  auto const_list = AsList(&cref);
+  for (size_t i = 0; i < const_list.size(); i++) {
+    auto str_interface = StringCast(const_list[i]);
+    EXPECT_FALSE(str_interface.has_value());
+    auto cstr_interface = StringCast<ConstOption::CONST>(const_list[i]);
+    auto endit = cstr_interface.value().end();
+    EXPECT_EQ(*(--endit), 'x');
+    auto str = ObjectCast<std::string>(const_list[i]);
+    EXPECT_EQ(str, nullptr);
+    auto cstr = ObjectCast<const std::string>(const_list[i]);
+    EXPECT_EQ(cstr->back(), 'x');
+  }
+  cnt = 0;
+  for (auto it = const_list.begin(); it != const_list.end(); it++, cnt++) {
+    auto descriptor = (*it).Descriptor();
+    EXPECT_EQ(descriptor.KindEnum(), Kind::STRING);
+    EXPECT_EQ(descriptor.TypeEnum(), Type::OTHER);
+    EXPECT_TRUE(descriptor.Traits(traits::is_const));
+    EXPECT_EQ(descriptor.Transform(transform::remove_const).TypeEnum(), Type::STD_STRING);
+    auto str = ObjectCast<const std::string>(*it);
+    EXPECT_EQ(*str, strlist[cnt]);
+  }
+
+  Iterator<Object> it = list.begin();
+  std::list<std::string> anol;
+  list = AsList(&anol);
+  EXPECT_TRUE(it != list.begin());
+  EXPECT_TRUE(list.begin() == list.end());
+  EXPECT_EQ(list.size(), 0);
+  EXPECT_TRUE(list.empty());
+  for (int i = 0; i < 5; i++) {
+    auto str = "no" + std::to_string(i);
+    list.insert(list.end(), GetReflection(&str));
+    EXPECT_EQ(list.size(), i + 1);
+  }
+  EXPECT_EQ(anol.size(), 5);
+  cnt = 0;
+  for (auto& v : anol) {
+    EXPECT_EQ(v, "no" + std::to_string(cnt));
+    cnt++;
+  }
+  std::string _{"abc"};
+  list.resize(10, GetReflection(&_));
+  EXPECT_EQ(anol.size(), 10);
+  auto iter = std::next(anol.begin(), 5);
+  for (int i = 5; i < 10; i++) {
+    EXPECT_EQ(*iter, "abc");
+    iter++;
+  }
+  it = list.begin();
+  std::advance(it, 5);
+  for (int i = 5; i < 10; i++) {
+    auto p = StringCast(*it);
+    EXPECT_STRCASEEQ(p.value().c_str(), "abc");
+    it++;
+  }
+  while (!list.empty()) {
+    it = list.erase(list.begin());
+  }
+  EXPECT_EQ(anol.size(), 0);
+  _ = "new str";
+  list.insert(list.begin(), GetReflection(&_));
+  const_list = list;
+  EXPECT_STREQ(StringCast<ConstOption::NON_CONST>(*const_list.begin())->c_str(), "new str");
+}
+
+TEST(TestString, basic) {
+  using namespace liteproto;
+  std::string stdstr;
+  auto str = AsString(&stdstr);
+  ASSERT_TRUE(str.empty());
+  ASSERT_EQ(str.size(), 0);
+  ASSERT_TRUE(str.begin() == str.end());
+  str.append("123").append("456").append("789");
+  EXPECT_EQ(str.size(), 9);
+
+  EXPECT_EQ(stdstr, "123456789");
+
+  EXPECT_STRCASEEQ(str.c_str(), "123456789");
+  EXPECT_STRCASEEQ(str.data(), "123456789");
 }
 
 TEST(TestReflection, Basic) {

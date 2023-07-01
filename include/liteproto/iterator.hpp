@@ -29,12 +29,14 @@ struct IteratorInterface {
   using indirection_t = reference_or_value(const std::any&) noexcept;
   using member_of_object_t = pointer(const std::any&) noexcept;
   using increment_t = void(std::any&);
+  using decrement_t = void(std::any&);
   using noteq_t = bool(const std::any&, const Iterator<Tp>&) noexcept;
 
   using adapter_type_id_t = uint64_t(const std::any&) noexcept;
   indirection_t* indirection;
   member_of_object_t* member_of_object;
   increment_t* increment;
+  decrement_t* decrement;
   noteq_t* noteq;
   adapter_type_id_t* adapter_type_id;
 };
@@ -59,7 +61,7 @@ class IteratorBase {
   using difference_type = std::ptrdiff_t;
   using pointer = typename internal::IteratorInterface<Tp>::pointer;
   using reference = typename internal::IteratorInterface<Tp>::reference_or_value;
-  using iterator_category = std::forward_iterator_tag;
+  using iterator_category = std::bidirectional_iterator_tag;
 
   reference operator*() noexcept { return interface_.indirection(it_); }
   //  pointer operator->() noexcept { return interface_.member_of_object(it_); }
@@ -71,6 +73,16 @@ class IteratorBase {
   iterator operator++(int) {
     Iterator old{*this};
     ++(*this);
+    return old;
+  }
+
+  iterator& operator--() {
+    interface_.decrement(it_);
+    return static_cast<iterator&>(*this);
+  }
+  iterator operator--(int) {
+    Iterator old{*this};
+    --(*this);
     return old;
   }
 
@@ -156,6 +168,9 @@ class Iterator<Object> : public IteratorBase<Object> {
   Iterator& operator=(const Iterator&) = default;
   Iterator& operator=(Iterator&&) noexcept = default;
 
+  bool operator==(const Iterator& rhs) const noexcept { return !(*this != rhs); }
+  bool operator!=(const Iterator& rhs) const noexcept { return base::interface_.noteq(base::it_, rhs); }
+
  private:
   template <class ItAdapter>
   Iterator(ItAdapter&& it, const internal::IteratorInterface<Object>& inter)
@@ -206,6 +221,12 @@ struct IteratorInterfaceImpl {
   }
   static_assert(std::is_same_v<decltype(Increment), typename base::increment_t>);
 
+  static void Decrement(std::any& obj) {
+    auto* ptr = std::any_cast<It>(&obj);
+    (*ptr).Decrement();
+  }
+  static_assert(std::is_same_v<decltype(Decrement), typename base::decrement_t>);
+
   static bool NotEq(const std::any& obj, const Iterator<Tp>& rhs) noexcept {
     auto* ptr = std::any_cast<It>(&obj);
     return (*ptr) != rhs;
@@ -227,6 +248,7 @@ auto MakeIteratorInterface() noexcept {
   interface.indirection = &impl::Indirection;
   interface.member_of_object = &impl::MemberOfObject;
   interface.increment = &impl::Increment;
+  interface.decrement = &impl::Decrement;
   interface.noteq = &impl::NotEq;
   interface.adapter_type_id = &impl::AdapterTypeId;
   return interface;
@@ -283,6 +305,8 @@ class IteratorAdapter {
   }
 
   void Increment() { ++it_; }
+  void Decrement() { --it_; }
+
   bool operator!=(const Iterator<value_type>& rhs) const {
     if (AdapterTypeId() != rhs.AdapterTypeId()) {
       return true;
@@ -294,9 +318,10 @@ class IteratorAdapter {
 
   [[nodiscard]] uint64_t AdapterTypeId() const { return TypeMeta<IteratorAdapter>::Id(); }
 
-  IteratorAdapter& InsertMyself(container_type* container, value_type v) {
+  template <class V>
+  IteratorAdapter& InsertMyself(container_type* container, V&& v) {
     if constexpr (!std::is_const_v<container_type>) {
-      it_ = container->insert(it_, std::move(v));
+      it_ = container->insert(it_, std::forward<V>(v));
     }
     return *this;
   }

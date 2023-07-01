@@ -12,14 +12,6 @@
 
 #include "liteproto/traits/traits.hpp"
 
-using uint8_t = std::uint8_t;
-using int8_t = std::int8_t;
-using uint32_t = std::uint32_t;
-using int32_t = std::int32_t;
-using uint64_t = std::uint64_t;
-using int64_t = std::int64_t;
-using size_t = std::size_t;
-
 #if !defined(__cpp_rtti)
 #warning The macro __cpp_rtti has not been defiend!
 #endif
@@ -85,6 +77,7 @@ enum class Type : int32_t {
   FLOAT32,
   FLOAT64,
   BOOLEAN,
+  CHAR,
 
   OBJECT,
   MESSAGE,
@@ -396,6 +389,10 @@ struct TypeMeta {
   static constexpr Type TypeEnum() noexcept {
     if constexpr (std::is_same_v<Tp, Object>) {
       return Type::OBJECT;
+    } else if constexpr (std::is_same_v<Tp, char>) {
+      return Type::CHAR;
+    } else if constexpr (std::is_same_v<Tp, bool>) {
+      return Type::BOOLEAN;
     } else if constexpr (std::is_same_v<Tp, uint8_t>) {
       return Type::UINT8;
     } else if constexpr (std::is_same_v<Tp, int8_t>) {

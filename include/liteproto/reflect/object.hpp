@@ -24,8 +24,14 @@ class Object;
 template <class Tp, ConstOption ConstOpt>
 class List;
 
+template <ConstOption ConstOpt>
+class String;
+
 template <class Tp, ConstOption Opt = ConstOption::NON_CONST>
 std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept;
+
+template <ConstOption Opt = ConstOption::NON_CONST>
+std::optional<String<Opt>> StringCast(const Object& object) noexcept;
 
 class Object {
   template <class Tp>
@@ -33,6 +39,9 @@ class Object {
 
   template <class Tp, ConstOption Opt>
   friend std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept;
+
+  template <ConstOption Opt>
+  friend std::optional<String<Opt>> StringCast(const Object& object) noexcept;
 
  public:
   [[nodiscard]] addr_t Addr() const noexcept {
@@ -88,7 +97,7 @@ class Object {
   TypeDescriptor descriptor_;
   std::any ptr_to_value_;
   std::any interface_;
-  void* addr_;
+  const void* addr_;
 };
 
 template <class Tp>

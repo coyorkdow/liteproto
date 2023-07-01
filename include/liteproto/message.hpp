@@ -8,7 +8,6 @@
 #include <iostream>
 #include <type_traits>
 
-#include "liteproto/list.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
 #include "liteproto/utils.hpp"

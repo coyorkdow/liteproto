@@ -9,6 +9,7 @@
 #include "liteproto/pair.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
+#include "liteproto/string.hpp"
 #include "liteproto/traits/traits.hpp"
 
 namespace liteproto {
@@ -18,7 +19,8 @@ template <class Tp>
   if constexpr (std::is_scalar_v<Tp>) {
     return Object(v);
   } else if constexpr (IsStringV<Tp>) {
-    // TODO
+    auto str = AsString(v);
+    return Object(v, str);
   } else if constexpr (IsListV<Tp>) {
     auto list = AsList(v);
     return Object(v, list);
@@ -63,6 +65,16 @@ template <class Tp, ConstOption Opt>
 std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept {
   using return_type = std::optional<List<Tp, Opt>>;
   auto indirect_ptr = std::any_cast<List<Tp, Opt>>(&object.interface_);
+  if (indirect_ptr == nullptr) {
+    return return_type{};
+  }
+  return return_type{*indirect_ptr};
+}
+
+template <ConstOption Opt>
+std::optional<String<Opt>> StringCast(const Object& object) noexcept {
+  using return_type = std::optional<String<Opt>>;
+  auto indirect_ptr = std::any_cast<String<Opt>>(&object.interface_);
   if (indirect_ptr == nullptr) {
     return return_type{};
   }

@@ -20,6 +20,9 @@ static_assert(has_append_v<std::string, char>);
 static_assert(IsStringV<std::string>);
 static_assert(IsStringV<const std::string>);
 static_assert(IsListV<std::vector<int>>);
+static_assert(IsListV<std::string>);
+static_assert(std::is_same_v<typename ListTraits<std::string>::container_type, std::string>);
+static_assert(std::is_same_v<typename ListTraits<std::string>::value_type, char>);
 static_assert(IsListV<const std::vector<int>>);
 static_assert(has_subscript_v<std::vector<int>, int>);
 

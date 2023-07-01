@@ -14,6 +14,14 @@
 
 namespace liteproto {
 
+namespace internal {
+template <class Tp, class = void>
+class ListAdapter;
+}
+
+template <class C, class = internal::ListAdapter<C>>
+auto AsList(C* container) noexcept;
+
 template <class Tp>
 class List<Tp, ConstOption::NON_CONST> {
   template <class C, class>
@@ -49,11 +57,11 @@ class List<Tp, ConstOption::NON_CONST> {
   List(List&&) noexcept = default;
   List& operator=(List&&) noexcept = default;
 
- private:
+ protected:
   template <class Adapter>
-  List(Adapter&& adapter, internal::ListInterface<Tp> interface) noexcept
+  List(Adapter&& adapter, const internal::ListInterface<Tp>& interface) noexcept
       : obj_(std::forward<Adapter>(adapter)), interface_(interface) {
-    static_assert(IsListV<List>, "Why is the Adapter<Tp, ConstOption::NON_CONST> itself is not a Adapter?");
+    static_assert(IsListV<List>, "Why the List<Tp, ConstOption::NON_CONST> itself is not a List?");
     static_assert(std::is_nothrow_move_constructible_v<List>);
   }
 
@@ -72,7 +80,7 @@ class List<Tp, ConstOption::CONST> {
   size_t size() const noexcept { return interface_.size(obj_); }
   bool empty() const noexcept { return interface_.empty(obj_); }
 
-  using iterator = Iterator<const Tp>;
+  using iterator = std::conditional_t<std::is_same_v<Tp, Object>, Iterator<Tp>, Iterator<const Tp>>;
 
   decltype(auto) begin() const noexcept { return interface_.begin(obj_); }
   decltype(auto) end() const noexcept { return interface_.end(obj_); }
@@ -83,12 +91,12 @@ class List<Tp, ConstOption::CONST> {
   List& operator=(List&&) noexcept = default;
 
   List(const List<Tp, ConstOption::NON_CONST>& rhs) noexcept
-      : interface_(rhs.interface_.const_interface()), obj_(rhs.interface_.to_const(rhs.obj_)) {}
+      : obj_(rhs.interface_.to_const(rhs.obj_)), interface_(rhs.interface_.const_interface()) {}
   List(List<Tp, ConstOption::NON_CONST>&& rhs) noexcept
-      : interface_(rhs.interface_.const_interface()), obj_(rhs.interface_.to_const(rhs.obj_)) {}
+      : obj_(rhs.interface_.to_const(rhs.obj_)), interface_(rhs.interface_.const_interface()) {}
   List& operator=(const List<Tp, ConstOption::NON_CONST>& rhs) noexcept {
-    this->interface_ = rhs.interface_.const_interface();
     this->obj_ = rhs.interface_.to_const(rhs.obj_);
+    this->interface_ = rhs.interface_.const_interface();
     return *this;
   }
   List& operator=(List<Tp, ConstOption::NON_CONST>&& rhs) noexcept {
@@ -97,10 +105,10 @@ class List<Tp, ConstOption::CONST> {
     return *this;
   }
 
- private:
+ protected:
   using interface_type = internal::ListInterface<std::conditional_t<std::is_same_v<Tp, Object>, Tp, const Tp>>;
   template <class Adapter>
-  List(Adapter&& adapter, interface_type interface) noexcept
+  List(Adapter&& adapter, const interface_type& interface) noexcept
       : obj_(std::forward<Adapter>(adapter)), interface_(interface) {}
 
   std::any obj_;
@@ -127,9 +135,6 @@ class List<const volatile Object, ConstOpt> {
 
 namespace internal {
 
-template <class Tp, class = void>
-class ListAdapter;
-
 template <class Tp>
 class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   static_assert(!std::is_reference_v<Tp>);
@@ -143,7 +148,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   using container_type = typename list_traits::container_type;
   using value_type = std::conditional_t<is_indirect, Object, typename list_traits::value_type>;
-  using unerlying_value_type = typename list_traits::value_type;
+  using underlying_value_type = typename list_traits::value_type;
   using iterator = typename List<value_type, static_cast<ConstOption>(std::is_const_v<container_type>)>::iterator;
   using iterator_value_type = typename iterator::value_type;
   using iterator_reference = typename iterator::reference;
@@ -165,7 +170,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
       if constexpr (!std::is_same_v<value_type, Object>) {
         container_->push_back(std::forward<Value>(v));
       } else {
-        auto v_ptr = ObjectCast<unerlying_value_type>(v);
+        auto v_ptr = ObjectCast<underlying_value_type>(v);
         if (v_ptr != nullptr) {
           // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
           container_->push_back(std::move(*v_ptr));
@@ -206,7 +211,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
       if constexpr (!std::is_same_v<value_type, Object>) {
         container_->resize(count, v);
       } else {
-        auto v_ptr = ObjectCast<unerlying_value_type>(v);
+        auto v_ptr = ObjectCast<underlying_value_type>(v);
         if (v_ptr != nullptr) {
           container_->resize(count, *v_ptr);
         }
@@ -236,21 +241,19 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   iterator insert(iterator pos, const value_type& v) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
     if constexpr (!std::is_const_v<container_type>) {
+      auto& any_iter = internal::GetIteratorAdapter(pos);
+      auto rhs_it = std::any_cast<iterator_adapter>(&any_iter);
+      if (rhs_it == nullptr) {
+        return end();
+      }
       if constexpr (!std::is_same_v<value_type, Object>) {
-        auto& any_iter = internal::GetIteratorAdapter(pos);
-        auto rhs_it = std::any_cast<iterator_adapter>(&any_iter);
-        if (rhs_it == nullptr) {
-          return end();
-        }
-        if constexpr (!std::is_same_v<value_type, Object>) {
-          rhs_it->InsertMyself(container_, v);
-          return pos;
-        } else {
-          auto v_ptr = ObjectCast<unerlying_value_type>(v);
-          if (v_ptr != nullptr) {
-            // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
-            rhs_it.InsertMyself(container_, std::move(*v_ptr));
-          }
+        rhs_it->InsertMyself(container_, v);
+        return pos;
+      } else {
+        auto v_ptr = ObjectCast<underlying_value_type>(v);
+        if (v_ptr != nullptr) {
+          // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
+          rhs_it->InsertMyself(container_, std::move(*v_ptr));
         }
       }
     }
@@ -272,13 +275,13 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   [[nodiscard]] std::any ToConst() const noexcept { return maybe_const_adapter{container_}; }
 
- private:
+ protected:
   container_type* container_;
 };
 
 }  // namespace internal
 
-template <class C, class = internal::ListAdapter<C>>
+template <class C, class>
 auto AsList(C* container) noexcept {
   internal::ListAdapter<C> adapter{container};
 

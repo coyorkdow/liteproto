@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(liteproto)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
+message(STATUS "CMake C++ Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
+message(STATUS "CMake C Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 
 list(APPEND liteproto_headers
         include/liteproto/liteproto.hpp
