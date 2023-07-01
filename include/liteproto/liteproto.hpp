@@ -22,7 +22,7 @@
   void set_##name(const decltype(name##_)& v) { name##_ = std::move(v); }                           \
   void set_##name(decltype(name##_)&& v) { name##_ = std::move(v); }                                \
   static constexpr decltype(auto) FIELD_name(liteproto::int32_constant<__LINE__>) { return #name; } \
-  auto FIELD_type(liteproto::int32_constant<__LINE__>)->decltype(test_field_);                      \
+  auto FIELD_type(liteproto::int32_constant<__LINE__>)->decltype(name##_);                          \
   constexpr decltype(name##_)& FIELD_value(liteproto::int32_constant<__LINE__>) { return name##_; } \
   constexpr const decltype(name##_)& FIELD_value(liteproto::int32_constant<__LINE__>) const { return name##_; }
 

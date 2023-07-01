@@ -6,7 +6,9 @@
 
 #include <array>
 #include <iostream>
+#include <map>
 #include <type_traits>
+#include <utility>
 
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
@@ -14,8 +16,13 @@
 
 namespace liteproto {
 
+class Message {
+ public:
+ private:
+};
+
 template <class Msg, int32_t Line>
-class MessageBase {
+class MessageBase : public Message {
  public:
   template <size_t I = 0, size_t N>
   static constexpr auto GetFieldIndexByName(const char (&str)[N]) {
@@ -48,6 +55,12 @@ class MessageBase {
 #endif
   };
 
+  static const std::map<int32_t, const char*>& FieldsName() noexcept {
+    static const std::map<int32_t, const char*> fields_name_ =
+        MakeDynamicalFieldsName(std::make_index_sequence<FieldsIndices::value.size()>{});
+    return fields_name_;
+  }
+
  private:
   template <size_t... I>
   [[nodiscard]] constexpr auto DumpTupleImpl(std::index_sequence<I...>) const {
@@ -61,6 +74,25 @@ class MessageBase {
     auto& msg = static_cast<Msg&>(*this);
     constexpr auto indices = FieldsIndices::value;
     return std::forward_as_tuple(msg.FIELD_value(int32_constant<indices[I].second>{})...);
+  }
+
+  template <size_t... I>
+  static auto MakeDynamicalFieldsName(std::index_sequence<I...>) noexcept {
+    std::map<int32_t, const char*> fields_name;
+    (GetNameForEachField<I>(&fields_name), ...);
+    return fields_name;
+  }
+
+  template <size_t I>
+  static void GetNameForEachField(std::map<int32_t, const char*>* field_name) noexcept {
+    constexpr auto index = FieldsIndices::value[I];
+    (*field_name)[index.first] = Msg::FIELD_name(int32_constant<index.second>{});
+  }
+
+  template <size_t I, class Msg_>
+  static void ApplyReflectForEachField(Msg_&& msg, std::map<int32_t, Object>* field) {
+    constexpr auto index = FieldsIndices::value[I];
+    field->insert(std::make_pair(index.first, GetReflection(&msg.FIELD_value(int32_constant<index.second>{}))));
   }
 };
 

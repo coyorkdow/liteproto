@@ -19,6 +19,10 @@ static_assert(!std::is_same_v<int8_t, char>, "liteproto requires that int8_t is 
 namespace liteproto {
 
 namespace details {
+
+using std::begin;
+using std::end;
+
 template <class C,
           class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::size), const C>, size_t>>>
 auto HasSize(int) -> std::true_type;
@@ -35,8 +39,8 @@ auto HasConstexprSize(int) -> std::true_type;
 template <class>
 auto HasConstexprSize(float) -> std::false_type;
 
-template <class C, class V, class = decltype(std::declval<C&>().resize(std::declval<size_t>())),
-          class = decltype(std::declval<C&>().resize(std::declval<size_t>(), std::declval<V>()))>
+template <class C, class V, class = decltype(std::declval<C>().resize(std::declval<size_t>())),
+          class = decltype(std::declval<C>().resize(std::declval<size_t>(), std::declval<V>()))>
 auto HasReSize(int) -> std::true_type;
 
 template <class, class>
@@ -62,7 +66,7 @@ auto HasClear(int) -> std::true_type;
 template <class>
 auto HasClear(float) -> std::false_type;
 
-template <class C, class V, class = decltype(std::declval<C&>().push_back(std::declval<V>()))>
+template <class C, class V, class = decltype(std::declval<C>().push_back(std::declval<V>()))>
 auto HasPushBack(int) -> std::true_type;
 
 template <class, class>
@@ -89,13 +93,21 @@ template <class, class>
 auto HasAppend(float) -> std::false_type;
 
 template <class C, class V,
-          class = std::enable_if_t<std::is_same_v<V*, decltype(std::declval<C&>().data())> &&
-                                   (std::is_same_v<V*, decltype(std::declval<const C&>().data())> ||
-                                    std::is_same_v<const V*, decltype(std::declval<const C&>().data())>)>>
+          class = std::enable_if_t<std::is_same_v<V*, decltype(std::declval<C>().data())> &&
+                                   (std::is_same_v<V*, decltype(std::declval<const C>().data())> ||
+                                    std::is_same_v<const V*, decltype(std::declval<const C>().data())>)>>
 auto HasData(int) -> std::true_type;
 
 template <class C, class V>
 auto HasData(float) -> std::false_type;
+
+template <class C, class K, class V, class Iter = decltype(std::declval<C>().find(std::declval<K>())),
+          class = std::enable_if_t<std::is_same_v<const K, decltype(std::declval<Iter>()->first)> &&
+                                   std::is_same_v<V, decltype(std::declval<Iter>()->second)>>>
+auto HasFind(int) -> std::true_type;
+
+template <class C, class K, class V>
+auto HasFind(float) -> std::false_type;
 
 template <class It, class = std::enable_if_t<std::is_base_of_v<std::forward_iterator_tag,
                                                                typename std::iterator_traits<It>::iterator_category>>>
@@ -111,8 +123,21 @@ auto IsBidirectionalIterator(int) -> std::true_type;
 template <class>
 auto IsBidirectionalIterator(float) -> std::false_type;
 
-using std::begin;
-using std::end;
+template <class C, class It = decltype(begin(std::declval<C>())),
+          class = decltype(std::declval<C>().erase(std::declval<It>()))>
+auto HasErase(int) -> std::true_type;
+
+template <class>
+auto HasErase(float) -> std::false_type;
+
+template <class C, class V, class It = decltype(begin(std::declval<C>())),
+          class = decltype(std::declval<C>().insert(std::declval<It>(), std::declval<V>()))>
+auto HasInsert(int) -> std::true_type;
+
+template <class, class>
+auto HasInsert(float) -> std::false_type;
+
+// For builtin array compatible. All traits about the iterable and subscript operator use reference in std::declval;
 
 template <class Tp, class = std::enable_if_t<
                         std::is_same_v<decltype(begin(std::declval<Tp&>())), decltype(end(std::declval<Tp&>()))>>>
@@ -127,20 +152,6 @@ auto IsBidirectionalIterable(int) -> decltype(IsBidirectionalIterator<decltype(b
 
 template <class>
 auto IsBidirectionalIterable(float) -> std::false_type;
-
-template <class C, class It = decltype(begin(std::declval<C&>())),
-          class = decltype(std::declval<C&>().erase(std::declval<It>()))>
-auto HasErase(int) -> std::true_type;
-
-template <class>
-auto HasErase(float) -> std::false_type;
-
-template <class C, class V, class It = decltype(begin(std::declval<C&>())),
-          class = decltype(std::declval<C&>().insert(std::declval<It>(), std::declval<V>()))>
-auto HasInsert(int) -> std::true_type;
-
-template <class, class>
-auto HasInsert(float) -> std::false_type;
 
 template <class C, class V,
           class = std::enable_if_t<
@@ -280,5 +291,11 @@ struct has_data : decltype(details::HasData<C, Tp>(0)) {};
 
 template <class C, class Tp>
 inline constexpr bool has_data_v = has_data<C, Tp>::value;
+
+template <class C, class K, class V>
+struct has_find : decltype(details::HasFind<C, K, V>(0)) {};
+
+template <class C, class K, class V>
+inline constexpr bool has_find_v = has_find<C, K, V>::value;
 
 }  // namespace liteproto

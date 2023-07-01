@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 17)
 message(STATUS "CMake C++ Compiler: ${CMAKE_CXX_COMPILER_ID} ${CMAKE_CXX_COMPILER_VERSION}")
 message(STATUS "CMake C Compiler: ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 
+add_compile_options(-g -Wall)
+
 list(APPEND liteproto_headers
         include/liteproto/liteproto.hpp
         include/liteproto/message.hpp
@@ -15,11 +17,10 @@ list(APPEND liteproto_headers
         include/liteproto/reflect/object.hpp
         include/liteproto/static_test/static_test.hpp)
 
-add_compile_options(-g -Wall)
-
 add_library(liteproto STATIC src/liteproto.cpp)
 
 target_include_directories(liteproto PUBLIC include)
+target_include_directories(liteproto PUBLIC thirdparty/nameof/include)
 #target_compile_definitions(liteproto PUBLIC LITE_PROTO_DISABLE_COMPATIBLE_MODE_)
 
 set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)

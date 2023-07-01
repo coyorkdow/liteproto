@@ -11,6 +11,7 @@
 #include "gtest/gtest.h"
 #include "liteproto/liteproto.hpp"
 #include "liteproto/static_test/static_test.hpp"
+#include "nameof.hpp"
 
 void IterateObject(const liteproto::Object& obj) {
   using namespace liteproto;
@@ -195,24 +196,31 @@ TEST(TestReflection, Basic) {
 
 template <class T1, class T2, class T3>
 TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
-  T1 FIELD(test_field)->Seq<1>;
-  T2 FIELD(test_field2)->Seq<2>;
-  T3 FIELD(test_field3)->Seq<3>;
+  T1 FIELD(foo)->Seq<1>;
+  T2 FIELD(bar)->Seq<2>;
+  T3 FIELD(baz)->Seq<3>;
 
-  TestMessage(T1 v1, T2 v2, T3 v3) noexcept
-      : test_field_(std::move(v1)), test_field2_(std::move(v2)), test_field3_(std::move(v3)) {}
+  TestMessage(T1 v1, T2 v2, T3 v3) noexcept : foo_(std::move(v1)), bar_(std::move(v2)), baz_(std::move(v3)) {}
 };
 
 TEST(TestMsgFundamenal, basic) {
   TestMessage<int, float, std::string> msg{1, 2.5, "str"};
-  EXPECT_EQ(msg.test_field(), 1);
-  EXPECT_FLOAT_EQ(msg.test_field2(), 2.5);
-  EXPECT_EQ(msg.test_field3(), "str");
+  EXPECT_EQ(msg.foo(), 1);
+  EXPECT_FLOAT_EQ(msg.bar(), 2.5);
+  EXPECT_EQ(msg.baz(), "str");
   auto tuple_ref = msg.DumpForwardTuple();
   std::get<0>(tuple_ref)++;
   std::get<1>(tuple_ref)--;
   std::get<2>(tuple_ref).append("str");
-  EXPECT_EQ(msg.test_field(), 2);
-  EXPECT_FLOAT_EQ(msg.test_field2(), 1.5);
-  EXPECT_EQ(msg.test_field3(), "strstr");
+  EXPECT_EQ(msg.foo(), 2);
+  EXPECT_FLOAT_EQ(msg.bar(), 1.5);
+  EXPECT_EQ(msg.baz(), "strstr");
+
+  auto& names = decltype(msg)::FieldsName();
+  for (auto& [i, name] : names) {
+    EXPECT_TRUE(i == 1 || i == 2 || i == 3);
+    if (i == 1) EXPECT_EQ(name, "foo");
+    if (i == 2) EXPECT_EQ(name, "bar");
+    if (i == 3) EXPECT_EQ(name, "baz");
+  }
 }

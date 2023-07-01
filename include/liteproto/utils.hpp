@@ -19,8 +19,8 @@ namespace liteproto {
 template <int32_t N>
 using int32_constant = std::integral_constant<int32_t, N>;
 
-template <int32_t N>
-using Seq = int32_constant<N>;
+template <int32_t N, class = std::enable_if_t<N >= 0>>
+struct Seq : int32_constant<N> {};
 
 namespace internal {
 using PII = std::pair<int32_t, int32_t>;
@@ -46,17 +46,16 @@ constexpr auto SubSTDArray(std::index_sequence<S...>, const std::array<Tp, N>& a
   return std::array<Tp, sizeof...(S)>{arr[S + Offset]...};
 }
 
-template <class Tp, size_t... S1, size_t... S2>
-constexpr auto MergeSTDArray(std::index_sequence<S1...>, std::index_sequence<S2...>,
-                             const std::array<Tp, sizeof...(S1)>& a1, const std::array<Tp, sizeof...(S2)>& a2) {
-  if constexpr (sizeof...(S1) == 0) {
+template <class Tp, size_t S1, size_t S2>
+constexpr auto MergeSTDArray(const std::array<Tp, S1>& a1, const std::array<Tp, S2>& a2) {
+  if constexpr (S1 == 0) {
     return a2;
-  } else if constexpr (sizeof...(S2) == 0) {
+  } else if constexpr (S2 == 0) {
     return a1;
   } else {
-    using l = std::make_index_sequence<sizeof...(S1) - 1>;
-    using r = std::make_index_sequence<sizeof...(S2) - 1>;
-    auto rest = MergeSTDArray(l{}, r{}, SubSTDArray<1>(l{}, a1), SubSTDArray<1>(r{}, a2));
+    using l = std::make_index_sequence<S1 - 1>;
+    using r = std::make_index_sequence<S2 - 1>;
+    auto rest = MergeSTDArray(SubSTDArray<1>(l{}, a1), SubSTDArray<1>(r{}, a2));
     if (a1[0] < a2[0]) {
       return ConcatSTDArray(std::index_sequence<0, 1>{}, std::make_index_sequence<rest.size()>{},
                             std::array<Tp, 2>{a1[0], a2[0]}, rest);
@@ -67,18 +66,27 @@ constexpr auto MergeSTDArray(std::index_sequence<S1...>, std::index_sequence<S2.
   }
 }
 
-template <class Tp, size_t... S>
-constexpr auto SortSTDArray(std::index_sequence<S...>, const std::array<Tp, sizeof...(S)>& arr) {
-  if constexpr (sizeof...(S) <= 1) {
+template <class Tp, size_t N>
+constexpr auto SortSTDArray(const std::array<Tp, N>& arr) {
+  if constexpr (N <= 1) {
     return arr;
   } else {
-    constexpr size_t l = sizeof...(S) / 2;
-    constexpr size_t r = sizeof...(S) - l;
-    auto sorted1 = SortSTDArray(std::make_index_sequence<l>{}, SubSTDArray<0>(std::make_index_sequence<l>{}, arr));
-    auto sorted2 = SortSTDArray(std::make_index_sequence<r>{}, SubSTDArray<l>(std::make_index_sequence<r>{}, arr));
-    return MergeSTDArray(std::make_index_sequence<sorted1.size()>{}, std::make_index_sequence<sorted2.size()>{},
-                         sorted1, sorted2);
+    constexpr size_t l = N / 2;
+    constexpr size_t r = N - l;
+    auto sorted1 = SortSTDArray(SubSTDArray<0>(std::make_index_sequence<l>{}, arr));
+    auto sorted2 = SortSTDArray(SubSTDArray<l>(std::make_index_sequence<r>{}, arr));
+    return MergeSTDArray(sorted1, sorted2);
   }
+}
+
+template <size_t N>
+constexpr bool NoDuplicate(const std::array<PII, N>& arr) {
+  for (size_t i = 1; i < arr.size(); i++) {
+    if (arr[i].first == arr[i - 1].first || arr[i].second == arr[i - 1].second) {
+      return false;
+    }
+  }
+  return true;
 }
 
 template <class Tp, int32_t Now, int32_t End>
@@ -107,7 +115,10 @@ constexpr decltype(auto) GetAllFields() {
       ConcatSTDArray(std::make_index_sequence<res3.size()>{}, std::make_index_sequence<res4.size()>{}, res3, res4);
   constexpr auto concat_final = ConcatSTDArray(std::make_index_sequence<concat1.size()>{},
                                                std::make_index_sequence<concat2.size()>{}, concat1, concat2);
-  return SortSTDArray(std::make_index_sequence<concat_final.size()>{}, concat_final);
+  constexpr auto final = SortSTDArray(concat_final);
+  static_assert(final.size() == 0 || final[0].first >= 0, "seq number must be greater than or equal to 0");
+  static_assert(NoDuplicate(final), "each field must has unique seq number in a same message");
+  return final;
 }
 
 template <class Tp, int32_t N>
@@ -142,8 +153,12 @@ constexpr decltype(auto) GetAllFields2() {
       ConcatSTDArray(std::make_index_sequence<res3.size()>{}, std::make_index_sequence<res4.size()>{}, res3, res4);
   constexpr auto concat_final = ConcatSTDArray(std::make_index_sequence<concat1.size()>{},
                                                std::make_index_sequence<concat2.size()>{}, concat1, concat2);
-  return SortSTDArray(std::make_index_sequence<concat_final.size()>{}, concat_final);
+  constexpr auto final = SortSTDArray(concat_final);
+  static_assert(final.size() == 0 || final[0].first >= 0, "seq number must be greater than or equal to 0");
+  static_assert(NoDuplicate(final), "each field must has unique seq number in a same message");
+  return final;
 }
+
 }  // namespace internal
 
 }  // namespace liteproto

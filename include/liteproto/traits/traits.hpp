@@ -36,8 +36,8 @@ inline constexpr bool is_string =
 
 template <class C, class V>
 inline constexpr bool is_array =
-    std::is_array_v<C> ||
-    (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> && is_bidirectional_iterable_v<C>);
+    std::is_array_v<C> || (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> &&
+                           is_bidirectional_iterable_v<C>);
 
 }  // namespace internal
 
