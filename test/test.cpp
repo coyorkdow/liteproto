@@ -81,7 +81,8 @@ TEST(TestList, ListOfString) {
     EXPECT_EQ(*str, strlist[cnt]);
   }
 
-  Iterator<Object> it = list.begin();
+  auto it = list.begin();
+  static_assert(std::is_same_v<decltype(it), ObjectIterator>);
   std::list<std::string> anol;
   list = AsList(&anol);
   EXPECT_TRUE(it != list.begin());
@@ -120,8 +121,13 @@ TEST(TestList, ListOfString) {
   EXPECT_EQ(anol.size(), 0);
   _ = "new str";
   list.insert(list.begin(), GetReflection(&_));
-  const_list = list;
-  EXPECT_STREQ(StringCast<ConstOption::NON_CONST>(*const_list.begin())->c_str(), "new str");
+  EXPECT_TRUE((*list.begin()).IsString<ConstOption::NON_CONST>());
+  const_list = list; // is const
+  auto csit = const_list.begin();
+  static_assert(std::is_same_v<decltype(csit), decltype(const_list.end())>);
+  EXPECT_FALSE((*csit).IsString<ConstOption::NON_CONST>());
+  EXPECT_TRUE((*csit).IsString<ConstOption::CONST>());
+  EXPECT_STREQ(StringCast<ConstOption::CONST>(*const_list.begin())->c_str(), "new str");
 }
 
 TEST(TestString, basic) {

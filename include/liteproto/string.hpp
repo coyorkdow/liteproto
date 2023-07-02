@@ -31,14 +31,17 @@ class String<ConstOption::NON_CONST> : public List<char, ConstOption::NON_CONST>
 
  public:
   using list_base = List<char, ConstOption::NON_CONST>;
-  char* data() const { return string_interface_.data(obj_); }
-  const char* c_str() const noexcept { return string_interface_.c_str(obj_); }
+  using string_interface = internal::StringInterface<char>;
+  using interface = typename list_base::interface;
+
+  char* data() const { return string_interface_->data(obj_); }
+  const char* c_str() const noexcept { return string_interface_->c_str(obj_); }
   String append(const char* cstr) const {
-    string_interface_.append(obj_, cstr, std::strlen(cstr));
+    string_interface_->append(obj_, cstr, std::strlen(cstr));
     return *this;
   }
   String append(const char* cstr, size_t n) const {
-    string_interface_.append(obj_, cstr, n);
+    string_interface_->append(obj_, cstr, n);
     return *this;
   }
 
@@ -49,14 +52,13 @@ class String<ConstOption::NON_CONST> : public List<char, ConstOption::NON_CONST>
 
  protected:
   template <class Adapter>
-  String(Adapter&& adapter, const internal::ListInterface<char>& list_interface,
-         const internal::StringInterface<char>& interface) noexcept
-      : list_base(std::forward<Adapter>(adapter), list_interface), string_interface_(interface) {
+  String(Adapter&& adapter, const interface& list_interface, const string_interface& string_interface) noexcept
+      : list_base(std::forward<Adapter>(adapter), list_interface), string_interface_(&string_interface) {
     static_assert(IsStringV<String>, "Why is the String<Tp, ConstOption::NON_CONST> itself is not a String?");
     static_assert(std::is_nothrow_move_constructible_v<String>);
   }
 
-  internal::StringInterface<char> string_interface_;
+  const string_interface* string_interface_;
 };
 
 template <>
@@ -66,8 +68,11 @@ class String<ConstOption::CONST> : public List<char, ConstOption::CONST> {
 
  public:
   using list_base = List<char, ConstOption::CONST>;
-  const char* data() const { return string_interface_.data(list_base::obj_); }
-  const char* c_str() const noexcept { return string_interface_.c_str(list_base::obj_); }
+  using string_interface = internal::StringInterface<const char>;
+  using interface = typename list_base::interface;
+
+  const char* data() const { return string_interface_->data(list_base::obj_); }
+  const char* c_str() const noexcept { return string_interface_->c_str(list_base::obj_); }
 
   String(const String& rhs) = default;
   String& operator=(const String&) = default;
@@ -75,15 +80,15 @@ class String<ConstOption::CONST> : public List<char, ConstOption::CONST> {
   String& operator=(String&&) noexcept = default;
 
   String(const String<ConstOption::NON_CONST>& rhs) noexcept
-      : list_base(rhs.string_interface_.to_const(rhs.obj_), rhs.interface_.const_interface()),
-        string_interface_(rhs.string_interface_.const_interface()) {}
+      : list_base(rhs.string_interface_->to_const(rhs.obj_), rhs.interface_->const_interface()),
+        string_interface_(&rhs.string_interface_->const_interface()) {}
   String(String<ConstOption::NON_CONST>&& rhs) noexcept
-      : list_base(rhs.string_interface_.to_const(rhs.obj_), rhs.interface_.const_interface()),
-        string_interface_(rhs.string_interface_.const_interface()) {}
+      : list_base(rhs.string_interface_->to_const(rhs.obj_), rhs.interface_->const_interface()),
+        string_interface_(&rhs.string_interface_->const_interface()) {}
   String& operator=(const String<ConstOption::NON_CONST>& rhs) noexcept {
-    this->obj_ = rhs.string_interface_.to_const(rhs.obj_);
-    this->interface_ = rhs.interface_.const_interface();
-    this->string_interface_ = rhs.string_interface_.const_interface();
+    this->obj_ = rhs.string_interface_->to_const(rhs.obj_);
+    this->interface_ = &rhs.interface_->const_interface();
+    this->string_interface_ = &rhs.string_interface_->const_interface();
     return *this;
   }
   String& operator=(String<ConstOption::NON_CONST>&& rhs) noexcept {
@@ -94,13 +99,12 @@ class String<ConstOption::CONST> : public List<char, ConstOption::CONST> {
 
  protected:
   template <class Adapter>
-  String(Adapter&& adapter, const internal::ListInterface<const char>& list_interface,
-         const internal::StringInterface<const char>& interface) noexcept
-      : list_base(std::forward<Adapter>(adapter), list_interface), string_interface_(interface) {
+  String(Adapter&& adapter, const interface& list_interface, const string_interface& string_interface) noexcept
+      : list_base(std::forward<Adapter>(adapter), list_interface), string_interface_(&string_interface) {
     static_assert(std::is_nothrow_move_constructible_v<String>);
   }
 
-  internal::StringInterface<const char> string_interface_;
+  const string_interface* string_interface_;
 };
 
 namespace internal {
@@ -133,11 +137,12 @@ template <class C, class>
 auto AsString(C* container) noexcept {
   internal::StringAdapter<C> adapter{container};
   static_assert(std::is_trivially_copyable_v<decltype(adapter)>);
-  static_assert(std::is_same_v<char, typename decltype(adapter)::value_type>);
+  static_assert(std::is_same_v<char, std::remove_cv_t<typename decltype(adapter)::value_type>>);
 
   constexpr auto const_opt = static_cast<ConstOption>(std::is_const_v<C>);
-  const auto& [list_interface, interface] = internal::MakeStringInterface<decltype(adapter)>();
-  String<const_opt> string{adapter, list_interface, interface};
+  auto& string_interface = internal::GetStringInterface<decltype(adapter)>();
+  auto& list_interface = internal::GetListInterface<decltype(adapter)>();
+  String<const_opt> string{adapter, list_interface, string_interface};
   return string;
 }
 

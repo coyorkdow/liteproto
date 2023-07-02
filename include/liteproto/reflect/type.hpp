@@ -95,7 +95,7 @@ enum class Type : int32_t {
   STD_UNORDERED_MAP,
   STD_STRING,
   STD_ARRAY,
-
+  STD_PAIR,
   STD_ANY,
 
   OTHER

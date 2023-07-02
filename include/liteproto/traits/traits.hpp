@@ -22,6 +22,7 @@
 namespace liteproto {
 
 class Object;
+class Number;
 
 namespace internal {
 
@@ -38,6 +39,10 @@ template <class C, class V>
 inline constexpr bool is_array =
     std::is_array_v<C> || (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> &&
                            is_bidirectional_iterable_v<C>);
+
+template <class C, class K, class V>
+inline constexpr bool is_map = has_insert_v<C, std::pair<K, V>> && has_find_v<C, K, V> && has_size_v<C> &&
+                               has_empty_v<C> && has_clear_v<C> && has_erase_v<C> && is_bidirectional_iterable_v<C>;
 
 }  // namespace internal
 
@@ -141,29 +146,43 @@ struct IsObject<const volatile Object> : std::true_type {};
 template <class Tp>
 inline constexpr bool IsObjectV = IsObject<Tp>::value;
 
+template <class Tp>
+struct IsNumber : std::false_type {};
+template <>
+struct IsNumber<Number> : std::true_type {};
+template <>
+struct IsNumber<const Number> : std::true_type {};
+template <>
+struct IsNumber<volatile Number> : std::true_type {};
+template <>
+struct IsNumber<const volatile Number> : std::true_type {};
+
+template <class Tp>
+inline constexpr bool IsNumberV = IsNumber<Tp>::value;
+
 template <class Tp, class Cond = void>
 struct ListTraits {};
 
 template <template <class...> class C, class V, class... Tps>
-struct ListTraits<C<V, Tps...>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
+struct ListTraits<C<V, Tps...>, std::enable_if_t<internal::is_list<C<V, Tps...>, V>>> {
   using container_type = C<V, Tps...>;
   using value_type = V;
 };
 
 template <template <class...> class C, class V, class... Tps>
-struct ListTraits<const C<V, Tps...>, std::enable_if_t<internal::is_list<C<V>, V>>> : std::true_type {
+struct ListTraits<const C<V, Tps...>, std::enable_if_t<internal::is_list<C<V, Tps...>, V>>> {
   using container_type = const C<V, Tps...>;
   using value_type = V;
 };
 
 template <template <class, auto...> class C, class V, auto... Args>
-struct ListTraits<C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> : std::true_type {
+struct ListTraits<C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> {
   using container_type = C<V, Args...>;
   using value_type = V;
 };
 
 template <template <class, auto...> class C, class V, auto... Args>
-struct ListTraits<const C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> : std::true_type {
+struct ListTraits<const C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> {
   using container_type = const C<V, Args...>;
   using value_type = V;
 };
@@ -186,6 +205,25 @@ struct IsString<const Str> : std::bool_constant<internal::is_string<Str, char>> 
 
 template <class Str>
 inline constexpr bool IsStringV = IsString<Str>::value;
+
+template <class C, class Cond = void>
+struct MapTraits {};
+
+template <template <class...> class C, class K, class V, class... Tps>
+struct MapTraits<C<K, V, Tps...>, std::enable_if_t<internal::is_map<C<K, V, Tps...>, K, V>>> {
+  using key_type = K;
+  using mapped_type = V;
+  using value_type = std::pair<const K, V>;
+  using container_type = C<K, V, Tps...>;
+};
+
+template <template <class...> class C, class K, class V, class... Tps>
+struct MapTraits<const C<K, V, Tps...>, std::enable_if_t<internal::is_map<C<K, V, Tps...>, K, V>>> {
+  using key_type = K;
+  using mapped_type = V;
+  using value_type = std::pair<const K, V>;
+  using container_type = const C<K, V, Tps...>;
+};
 
 template <class Tp, class Cond = void>
 struct ArrayTraits : std::false_type {};
