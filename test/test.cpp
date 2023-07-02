@@ -146,7 +146,7 @@ void IterateObject(const liteproto::Object& obj) {
   if (descriptor.KindEnum() == Kind::LIST) {
     descriptor = descriptor.ValueType();
     if (obj.IsList<Number, ConstOption::NON_CONST>()) {
-      EXPECT_EQ(descriptor.KindEnum(), Kind::SCALAR);
+      EXPECT_EQ(descriptor.KindEnum(), Kind::NUMBER);
       auto list = ListCast<Number>(obj);
       ASSERT_TRUE(list.has_value());
       for (int i = 0; i < 10; i++) {
@@ -188,6 +188,13 @@ TEST(TestReflection, Basic) {
       EXPECT_EQ(*iter, i);
     }
   }
+
+  int16_t v = -45;
+  auto o = GetReflection(&v);
+  EXPECT_EQ(o.Descriptor().KindEnum(), Kind::NUMBER);
+  auto vref = NumberCast(o);
+  ASSERT_TRUE(vref.has_value());
+  EXPECT_EQ(vref->AsInt64(), -45);
 }
 
 template <class T1, class T2, class T3>

@@ -17,14 +17,15 @@ namespace liteproto {
 
 template <class Tp>
 [[nodiscard]] Object GetReflection(Tp* v) noexcept {
-  if constexpr (std::is_scalar_v<Tp>) {
+  constexpr ConstOption opt [[maybe_unused]] = std::is_const_v<Tp> ? ConstOption::CONST : ConstOption::NON_CONST;
+  if constexpr (std::is_arithmetic_v<Tp> && !is_char_v<Tp>) {
+    return Object(v, NumberReference(*v));
+  } else if constexpr (std::is_scalar_v<Tp>) {
     return Object(v);
   } else if constexpr (IsStringV<Tp>) {
-    auto str = AsString(v);
-    return Object(v, str);
+    return Object(v, AsString(v));
   } else if constexpr (IsListV<Tp>) {
-    auto list = AsList(v);
-    return Object(v, list);
+    return Object(v, AsList(v));
   } else if constexpr (IsArrayV<Tp>) {
     // TODO
   } else if constexpr (IsPairV<Tp>) {
@@ -65,7 +66,7 @@ inline const TypeDescriptor& TypeMeta<Tp>::GetDescriptor() noexcept {
   return descriptor;
 }
 
-//template <class Tp, ConstOption Opt>
+// template <class Tp, ConstOption Opt>
 
 template <class Tp, ConstOption Opt>
 std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept {

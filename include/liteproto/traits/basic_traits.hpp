@@ -298,4 +298,31 @@ struct has_find : decltype(details::HasFind<C, K, V>(0)) {};
 template <class C, class K, class V>
 inline constexpr bool has_find_v = has_find<C, K, V>::value;
 
+template <class C>
+struct is_char : std::false_type {};
+
+template <>
+struct is_char<char> : std::true_type {};
+
+template <>
+struct is_char<wchar_t> : std::true_type {};
+
+template <>
+struct is_char<char16_t> : std::true_type {};
+
+template <>
+struct is_char<char32_t> : std::true_type {};
+
+template <class C>
+struct is_char<const C> : is_char<C> {};
+
+template <class C>
+struct is_char<volatile C> : is_char<C> {};
+
+template <class C>
+struct is_char<const volatile C> : is_char<C> {};
+
+template <class C>
+inline constexpr bool is_char_v = is_char<C>::value;
+
 }  // namespace liteproto

@@ -144,4 +144,10 @@ class NumberReference<ConstOption::CONST> {
   const internal::NumberInterface* interface_;
 };
 
+template <class Tp, std::enable_if_t<std::is_const_v<std::remove_reference_t<Tp>>, int> = 0>
+NumberReference(Tp&& v) -> NumberReference<ConstOption::CONST>;
+
+template <class Tp, std::enable_if_t<!std::is_const_v<std::remove_reference_t<Tp>>, int> = 0>
+NumberReference(Tp&& v) -> NumberReference<ConstOption::NON_CONST>;
+
 }  // namespace liteproto

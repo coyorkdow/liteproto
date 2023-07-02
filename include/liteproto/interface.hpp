@@ -20,7 +20,7 @@ struct ProxyType {
 
 template <class Tp>
 struct ProxyType<Tp, std::enable_if_t<std::is_arithmetic_v<std::remove_reference_t<Tp>> &&
-                                            !std::is_same_v<std::remove_cv_t<std::remove_reference_t<Tp>>, char>>> {
+                                      !is_char_v<std::remove_reference_t<Tp>>>> {
   using type = Number;
 };
 

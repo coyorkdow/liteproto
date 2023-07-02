@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string>
 
+#include "liteproto/reflect/number.hpp"
 #include "liteproto/reflect/type.hpp"
 #include "liteproto/traits/traits.hpp"
 
@@ -27,6 +28,9 @@ class List;
 template <ConstOption ConstOpt>
 class String;
 
+template <ConstOption Opt = ConstOption::NON_CONST>
+std::optional<NumberReference<Opt>> NumberCast(const Object& object) noexcept;
+
 template <class Tp, ConstOption Opt = ConstOption::NON_CONST>
 std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept;
 
@@ -36,6 +40,9 @@ std::optional<String<Opt>> StringCast(const Object& object) noexcept;
 class Object {
   template <class Tp>
   friend Object GetReflection(Tp* v) noexcept;
+
+  template <ConstOption Opt>
+  friend std::optional<NumberReference<Opt>> NumberCast(const Object& object) noexcept;
 
   template <class Tp, ConstOption Opt>
   friend std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept;
@@ -122,6 +129,16 @@ Tp* ObjectCast(const Object& object) noexcept {
     return nullptr;
   }
   return *indirect_ptr;
+}
+
+template <ConstOption Opt>
+std::optional<NumberReference<Opt>> NumberCast(const Object& object) noexcept {
+  using return_type = std::optional<NumberReference<Opt>>;
+  auto indirect_ptr = std::any_cast<NumberReference<Opt>>(&object.interface_);
+  if (indirect_ptr == nullptr) {
+    return return_type{};
+  }
+  return return_type{*indirect_ptr};
 }
 
 }  // namespace liteproto

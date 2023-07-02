@@ -19,29 +19,32 @@
 
 namespace liteproto {
 
-// Thees are four data structures abstraction that supported by liteproto: list, map, string, array.
+// Thees are six abstract interfaces that supported by liteproto: Number, Message, List, Map, String, Array.
 
-// A list is a flexible-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
-// operator[]), but no random accessible required. A list also supports push_back and pop_back, and inserts a
+// A List is a flexible-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
+// operator[]), but no random accessible required. A List also supports push_back and pop_back, and inserts a
 // new element to arbitrary position.
-// A list also supports size(), empty(), and clear().
+// A List also supports size(), empty(), and clear().
 
-// A map is an key-value pairs collection. Each key must be unique in a map, and the value can be looked up via the
-// corresponding key. A map uses get() to look up and update() to modify. A map also supports size(), empty(), and
-// clear().
+// A Map is an key-value pairs collection. Each key must be unique in a map, and the value can be looked up via the
+// corresponding key. A Map also supports size(), empty(), and clear().
 
-// A string is almost the same as a list, except it doesn't be regarded as a container_type. A string is represented
-// by a single value, like "123" or "abc". Since the String is not a container_type, the underlying type cannot be
-// further inspected. A string supports all the operators that list supports.
+// A String is almost the same as a list, In fact it offers all the operations that offered by List. A String is
+// represented by a single value, like "123" or "abc". Since the String is not a container_type, the underlying type
+// cannot be further inspected.
 
-// An array is a fixed-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
-// operator[]). It doesn't support any other way to look up or modify. An array also supports size().
+// An Array is a fixed-sized sequential container_type. The elements can be accessed by subscript operator (i.e.,
+// operator[]). It doesn't support any other way to look up or modify. An Array also supports size().
 
-// object types are (possibly cv-qualified) types that are not function types, reference types, or possibly cv-qualified
-// void. scalar types are (possibly cv-qualified) object types that are not array types or class types.
+// In cpp, object type is a category of types. object types are (possibly cv-qualified) types that are not function
+// types, reference types, or possibly cv-qualified void. scalar types are (possibly cv-qualified) object types that are
+// not array types or class types. But in liteproto, there is a different Object (we can differentiate them by
+// upper/lower case), which represents the base of all liteproto types.
 enum class Kind : int8_t {
   VOID,
-  SCALAR,
+  NUMBER,
+  CHAR,
+  OTHER_SCALAR,
   REFERENCE,
   FUNCTION,
   OBJECT,  // it means the Object in liteproto, not the std::is_object.
@@ -374,9 +377,13 @@ struct TypeMeta {
       return Kind::OBJECT;
     } else if constexpr (std::is_void_v<Tp>) {
       return Kind::VOID;
+    } else if constexpr (std::is_arithmetic_v<Tp> && !is_char_v<Tp>) {
+      return Kind::NUMBER;
+    } else if constexpr (is_char_v<Tp>) {
+      return Kind::CHAR;
     } else if constexpr (std::is_scalar_v<Tp>) {
       static_assert(std::is_scalar_v<std::nullptr_t>);
-      return Kind::SCALAR;
+      return Kind::OTHER_SCALAR;
     } else if constexpr (std::is_reference_v<Tp>) {
       return Kind::REFERENCE;
     } else if constexpr (std::is_function_v<Tp>) {
