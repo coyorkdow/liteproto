@@ -18,15 +18,20 @@ struct Dummy;
 using DummyPointer = Dummy*;
 }  // namespace internal
 
-template <class Tp, class Pointer, class Reference>
+template <class Tp, class Pointer, class Reference, class Category = std::bidirectional_iterator_tag>
 class Iterator;
 
-template <class Tp>
-using DefaultIterator = Iterator<Tp, Tp*, Tp&>;
+template <class Tp, class Category = std::bidirectional_iterator_tag>
+using DefaultIterator = Iterator<Tp, Tp*, Tp&, Category>;
 
-using ObjectIterator = Iterator<Object, internal::DummyPointer, Object>;
-using NumberIterator = Iterator<Number, internal::DummyPointer, NumberReference<ConstOption::NON_CONST>>;
-using ConstNumberIterator = Iterator<Number, internal::DummyPointer, NumberReference<ConstOption::CONST>>;
+template <class Category = std::bidirectional_iterator_tag>
+using ObjectIterator = Iterator<Object, internal::DummyPointer, Object, Category>;
+
+template <class Category = std::bidirectional_iterator_tag>
+using NumberIterator = Iterator<Number, internal::DummyPointer, NumberReference<ConstOption::NON_CONST>, Category>;
+
+template <class Category = std::bidirectional_iterator_tag>
+using ConstNumberIterator = Iterator<Number, internal::DummyPointer, NumberReference<ConstOption::CONST>, Category>;
 
 template <class Tp, ConstOption Opt>
 struct InterfaceTraits {
@@ -88,20 +93,19 @@ struct IteratorInterface {
 };
 
 template <class IteratorAdapter, class Tp, class Pointer, class Reference>
-Iterator<Tp, Pointer, Reference> MakeIterator(IteratorAdapter&& it,
-                                              const internal::IteratorInterface<Tp, Pointer, Reference>& inter);
+auto MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp, Pointer, Reference>& inter);
 
-template <class Tp, class Pointer, class Reference>
-std::any& GetIteratorAdapter(Iterator<Tp, Pointer, Reference>&) noexcept;
+template <class Tp, class Pointer, class Reference, class Category>
+std::any& GetIteratorAdapter(Iterator<Tp, Pointer, Reference, Category>&) noexcept;
 
-template <class Tp, class Pointer, class Reference>
-const std::any& GetIteratorAdapter(const Iterator<Tp, Pointer, Reference>&) noexcept;
+template <class Tp, class Pointer, class Reference, class Category>
+const std::any& GetIteratorAdapter(const Iterator<Tp, Pointer, Reference, Category>&) noexcept;
 
 }  // namespace internal
 
-template <class Tp, class Pointer, class Reference>
+template <class Tp, class Pointer, class Reference, class Category>
 class IteratorBase {
-  using iterator = Iterator<Tp, Pointer, Reference>;
+  using iterator = Iterator<Tp, Pointer, Reference, Category>;
 
  public:
   using value_type = Tp;
@@ -124,11 +128,11 @@ class IteratorBase {
     return old;
   }
 
-  iterator& operator--() {
+  auto operator--() -> std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag, Category>, iterator&> {
     interface_->decrement(it_);
     return static_cast<iterator&>(*this);
   }
-  iterator operator--(int) {
+  auto operator--(int) -> std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag, Category>, iterator> {
     Iterator old{*this};
     --(*this);
     return old;
@@ -154,23 +158,22 @@ class IteratorBase {
   const interface* interface_;
 };
 
-template <class Tp, class Pointer, class Reference>
-class Iterator : public IteratorBase<Tp, Pointer, Reference> {
+template <class Tp, class Pointer, class Reference, class Category>
+class Iterator : public IteratorBase<Tp, Pointer, Reference, Category> {
   template <class IteratorAdapter, class T, class P, class R>
-  friend Iterator<T, P, R> internal::MakeIterator(IteratorAdapter&& it,
-                                                  const internal::IteratorInterface<T, P, R>& inter);
+  friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R>& inter);
 
-  template <class T, class P, class R>
-  friend std::any& internal::GetIteratorAdapter(Iterator<T, P, R>&) noexcept;
+  template <class T, class P, class R, class C>
+  friend std::any& internal::GetIteratorAdapter(Iterator<T, P, R, C>&) noexcept;
 
-  template <class T, class P, class R>
-  friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R>&) noexcept;
+  template <class T, class P, class R, class C>
+  friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R, C>&) noexcept;
 
   template <class Container, class T, class P, class R>
   friend class internal::IteratorAdapter;
 
-  friend class IteratorBase<Tp, Pointer, Reference>;
-  using base = IteratorBase<Tp, Pointer, Reference>;
+  friend class IteratorBase<Tp, Pointer, Reference, Category>;
+  using base = IteratorBase<Tp, Pointer, Reference, Category>;
 
  public:
   Iterator() = default;
@@ -191,23 +194,23 @@ class Iterator : public IteratorBase<Tp, Pointer, Reference> {
   explicit Iterator(base&& iterator) noexcept : base(std::move(iterator)) {}
 };
 
-template <class Tp, class Reference>
-class Iterator<Tp, internal::DummyPointer, Reference> : public IteratorBase<Tp, internal::DummyPointer, Reference> {
+template <class Tp, class Reference, class Category>
+class Iterator<Tp, internal::DummyPointer, Reference, Category>
+    : public IteratorBase<Tp, internal::DummyPointer, Reference, Category> {
   template <class IteratorAdapter, class T, class P, class R>
-  friend Iterator<T, P, R> internal::MakeIterator(IteratorAdapter&& it,
-                                                  const internal::IteratorInterface<T, P, R>& inter);
+  friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R>& inter);
 
-  template <class T, class P, class R>
-  friend std::any& internal::GetIteratorAdapter(Iterator<T, P, R>&) noexcept;
+  template <class T, class P, class R, class C>
+  friend std::any& internal::GetIteratorAdapter(Iterator<T, P, R, C>&) noexcept;
 
-  template <class T, class P, class R>
-  friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R>&) noexcept;
+  template <class T, class P, class R, class C>
+  friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R, C>&) noexcept;
 
   template <class Container, class T, class P, class R>
   friend class internal::IteratorAdapter;
 
-  friend class IteratorBase<Tp, internal::DummyPointer, Reference>;
-  using base = IteratorBase<Tp, internal::DummyPointer, Reference>;
+  friend class IteratorBase<Tp, internal::DummyPointer, Reference, Category>;
+  using base = IteratorBase<Tp, internal::DummyPointer, Reference, Category>;
 
  public:
   Iterator() = default;
@@ -230,18 +233,17 @@ class Iterator<Tp, internal::DummyPointer, Reference> : public IteratorBase<Tp, 
 namespace internal {
 
 template <class IteratorAdapter, class Tp, class Pointer, class Reference>
-Iterator<Tp, Pointer, Reference> MakeIterator(IteratorAdapter&& it,
-                                              const IteratorInterface<Tp, Pointer, Reference>& inter) {
+auto MakeIterator(IteratorAdapter&& it, const IteratorInterface<Tp, Pointer, Reference>& inter) {
   return Iterator<Tp, Pointer, Reference>(std::forward<IteratorAdapter>(it), inter);
 }
 
-template <class Tp, class Pointer, class Reference>
-std::any& GetIteratorAdapter(Iterator<Tp, Pointer, Reference>& iterator) noexcept {
+template <class Tp, class Pointer, class Reference, class Category>
+std::any& GetIteratorAdapter(Iterator<Tp, Pointer, Reference, Category>& iterator) noexcept {
   return iterator.it_;
 }
 
-template <class Tp, class Pointer, class Reference>
-const std::any& GetIteratorAdapter(const Iterator<Tp, Pointer, Reference>& iterator) noexcept {
+template <class Tp, class Pointer, class Reference, class Category>
+const std::any& GetIteratorAdapter(const Iterator<Tp, Pointer, Reference, Category>& iterator) noexcept {
   return iterator.it_;
 }
 
@@ -358,7 +360,11 @@ class IteratorAdapter {
   }
 
   void Increment() { ++it_; }
-  void Decrement() { --it_; }
+  void Decrement() {
+    if constexpr (is_bidirectional_iterator_v<wrapped_iterator>) {
+      --it_;
+    }
+  }
 
   bool operator!=(const Iterator<value_type, pointer, reference>& rhs) const {
     if (AdapterTypeId() != rhs.AdapterTypeId()) {

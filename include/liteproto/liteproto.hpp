@@ -27,17 +27,17 @@
   constexpr decltype(name##_)& FIELD_value(liteproto::int32_constant<__LINE__>) { return name##_; } \
   constexpr const decltype(name##_)& FIELD_value(liteproto::int32_constant<__LINE__>) const { return name##_; }
 
-#if defined(__clang__) && defined(LITE_PROTO_DISABLE_COMPATIBLE_MODE_)
+#if defined(LITE_PROTO_DISABLE_COMPATIBLE_MODE_)
 #define FIELD(name)                    \
   LITE_PROTO_FIELD_DECLARE_BASE_(name) \
+  template <class Tp>                  \
   static constexpr int32_t FIELD_seq<__LINE__, Tp>
 
-#define DECLARE_FIELDS                     \
- public:                                   \
-  template <int32_t N, class>              \
-  static constexpr int32_t FIELD_seq = -1; \
-                                           \
- private:
+#define DECLARE_FIELDS()      \
+ public:                      \
+  template <int32_t N, class> \
+  static constexpr int32_t FIELD_seq = -1;
+
 // #elif defined(__GNUC__) || defined(__GNUG__)
 #else
 #define FIELD(name)                    \
@@ -45,5 +45,5 @@
   static auto FIELD_seq(liteproto::int32_constant<__LINE__>)
 
 using liteproto::Seq;
-#define DECLARE_FIELDS
+#define DECLARE_FIELDS()
 #endif

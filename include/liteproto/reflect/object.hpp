@@ -22,11 +22,14 @@ static_assert(sizeof(addr_t) == sizeof(void*));
 
 class Object;
 
-template <class Tp, ConstOption ConstOpt>
+template <class Tp, ConstOption Opt>
 class List;
 
-template <ConstOption ConstOpt>
+template <ConstOption Opt>
 class String;
+
+template <class K, class V, ConstOption Opt>
+class Map;
 
 template <ConstOption Opt = ConstOption::NON_CONST>
 std::optional<NumberReference<Opt>> NumberCast(const Object& object) noexcept;

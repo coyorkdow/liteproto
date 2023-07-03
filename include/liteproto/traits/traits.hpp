@@ -42,7 +42,7 @@ inline constexpr bool is_array =
 
 template <class C, class K, class V>
 inline constexpr bool is_map = has_insert_v<C, std::pair<K, V>> && has_find_v<C, K, V> && has_size_v<C> &&
-                               has_empty_v<C> && has_clear_v<C> && has_erase_v<C> && is_bidirectional_iterable_v<C>;
+                               has_empty_v<C> && has_clear_v<C> && has_erase_v<C> && is_forward_iterable_v<C>;
 
 }  // namespace internal
 
@@ -224,6 +224,15 @@ struct MapTraits<const C<K, V, Tps...>, std::enable_if_t<internal::is_map<C<K, V
   using value_type = std::pair<const K, V>;
   using container_type = const C<K, V, Tps...>;
 };
+
+template <class Tp, class Cond = void>
+struct IsMap : std::false_type {};
+
+template <class Tp>
+struct IsMap<Tp, std::void_t<typename MapTraits<Tp>::key_type>> : std::true_type {};
+
+template <class Str>
+inline constexpr bool IsMapV = IsMap<Str>::value;
 
 template <class Tp, class Cond = void>
 struct ArrayTraits : std::false_type {};

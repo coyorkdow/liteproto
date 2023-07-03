@@ -82,7 +82,7 @@ TEST(TestList, ListOfString) {
   }
 
   auto it = list.begin();
-  static_assert(std::is_same_v<decltype(it), ObjectIterator>);
+  static_assert(std::is_same_v<decltype(it), ObjectIterator<>>);
   std::list<std::string> anol;
   list = AsList(&anol);
   EXPECT_TRUE(it != list.begin());
@@ -122,7 +122,7 @@ TEST(TestList, ListOfString) {
   _ = "new str";
   list.insert(list.begin(), GetReflection(&_));
   EXPECT_TRUE((*list.begin()).IsString<ConstOption::NON_CONST>());
-  const_list = list; // is const
+  const_list = list;  // is const
   auto csit = const_list.begin();
   static_assert(std::is_same_v<decltype(csit), decltype(const_list.end())>);
   EXPECT_FALSE((*csit).IsString<ConstOption::NON_CONST>());

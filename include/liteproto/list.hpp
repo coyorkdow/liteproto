@@ -4,8 +4,6 @@
 
 #pragma once
 
-#include <memory>
-
 #include "liteproto/interface.hpp"
 #include "liteproto/iterator.hpp"
 #include "liteproto/reflect/object.hpp"

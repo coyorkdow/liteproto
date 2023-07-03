@@ -94,6 +94,11 @@ struct StringInterface {
   to_const_t* to_const;
 };
 
+template <class K, class V>
+struct MapInterface {
+
+};
+
 template <class Car, class Cdr>
 struct PairInterface {
   using car_t = Car&(const std::any&);

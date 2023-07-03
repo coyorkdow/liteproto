@@ -69,6 +69,9 @@ static_assert(!has_constexpr_size_v<std::vector<int>>);
 static_assert(has_find_v<std::map<std::string, int>, std::string, int>);
 static_assert(has_insert_v<std::map<std::string, int>, std::pair<std::string, int>>);
 
+static_assert(IsMapV<std::map<std::string, int>>);
+static_assert(IsMapV<std::unordered_map<std::string, int>>);
+
 #if defined(__cpp_concepts)
 
 template <class I>

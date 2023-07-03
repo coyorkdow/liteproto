@@ -5,6 +5,7 @@
 #pragma once
 
 #include "liteproto/list.hpp"
+#include "liteproto/map.hpp"
 #include "liteproto/message.hpp"
 #include "liteproto/pair.hpp"
 #include "liteproto/reflect/number.hpp"
