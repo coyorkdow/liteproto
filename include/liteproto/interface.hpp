@@ -81,30 +81,6 @@ struct StringInterface {
 template <class K, class V>
 struct MapInterface {};
 
-template <class Car, class Cdr>
-struct PairInterface {
-  using car_t = Car&(const std::any&);
-  using cdr_t = Cdr&(const std::any&);
-
-  car_t* car;
-  cdr_t* cdr;
-};
-
-template <class Pair, class Car, class Cdr>
-struct PairInterfaceImpl {
-  using base = PairInterface<Car, Cdr>;
-
-  static Car& CAR(const std::any& obj) noexcept {
-    auto* ptr = std::any_cast<Pair>(&obj);
-    return (*ptr).first();
-  }
-
-  static Cdr& CDR(const std::any& obj) noexcept {
-    auto* ptr = std::any_cast<Pair>(&obj);
-    return (*ptr).second();
-  }
-};
-
 template <class Adapter, class Tp, class Pointer, class Reference,
           // We make the default arguments of the corresponding const interface the same as the original arguments.
           // That is because for all non-const interfaces, we will manually specify the const arguments.

@@ -51,6 +51,13 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
   using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference>;
   using const_adapter = ListAdapter<const Tp, void>;
 
+  explicit MapAdapter(container_type* c) noexcept : container_(c) {
+    static_assert(std::is_copy_constructible_v<MapAdapter>);
+    static_assert(std::is_copy_assignable_v<MapAdapter>);
+    static_assert(std::is_nothrow_move_constructible_v<MapAdapter>);
+    static_assert(std::is_trivially_copyable_v<MapAdapter>);
+  }
+
   size_t size() const noexcept { return container_->size(); }
   bool empty() const noexcept { return container_->empty(); }
   void clear() const {
@@ -67,6 +74,51 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
 
   iterator end() const noexcept {
     iterator_adapter it_adapter{container_->end()};
+    return internal::MakeIterator<std::forward_iterator_tag>(std::move(it_adapter), GetIteratorInterface<decltype(it_adapter)>());
+  }
+
+  template <class Value>
+  std::pair<iterator, bool> insert(Value&& v) const {
+    // If the container is const, do nothing. And it's assured that this method will never be called.
+    if constexpr (std::is_const_v<container_type>) {
+      return 0;
+    } else {
+      if constexpr (IsObjectV<value_type>) {
+        static_assert(IsObjectV<std::remove_reference_t<Value>>);
+        auto v_ptr = ObjectCast<underlying_value_type>(v);
+        if (v_ptr != nullptr) {
+          // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
+//          rhs_it->InsertMyself(container_, std::move(*v_ptr));
+        }
+      } else if constexpr (IsNumberV<value_type>) {
+
+      } else {
+        auto res = container_->insert(std::forward<Value>(v));
+
+      }
+    }
+  }
+
+  iterator find(const value_type& key) const {
+    auto iter = container_->end();
+    if constexpr (IsObjectV<key_type>) {
+      auto k_ptr = ObjectCast<underlying_key_type>(key);
+      if (k_ptr == nullptr) {
+        return end();
+      }
+      iter = container_->find(*k_ptr);
+    } else if constexpr (IsNumberV<key_type>) {
+      if (key.IsSignedInteger()) {
+        iter = container_->find(key.AsInt64());
+      } else if (key.IsUnsigned()) {
+        iter = container_->find(key.AsUInt64());
+      } else {
+        iter = container_->find(key.AsFloat64());
+      }
+    } else {
+      iter = container_->find(key);
+    }
+    iterator_adapter it_adapter{iter};
     return internal::MakeIterator<std::forward_iterator_tag>(std::move(it_adapter), GetIteratorInterface<decltype(it_adapter)>());
   }
 
@@ -111,6 +163,11 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
   [[nodiscard]] std::any ToConst() const noexcept { return const_adapter{container_}; }
 
  private:
+  template <class It>
+  [[nodiscard]] iterator MakeIterator(It&& iterator) const noexcept {
+
+  }
+
   container_type* container_;
 };
 

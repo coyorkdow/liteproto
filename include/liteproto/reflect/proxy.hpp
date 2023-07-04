@@ -64,6 +64,12 @@ struct IsProxyType<Object> : std::true_type {};
 template <>
 struct IsProxyType<Number> : std::true_type {};
 
+template <ConstOption Opt>
+struct IsProxyType<NumberReference<Opt>> : std::true_type {};
+
+template <class FT, class ST>
+struct IsProxyType<std::pair<FT, ST>> : std::bool_constant<IsProxyType<FT>::value || IsProxyType<ST>::value> {};
+
 template <class Tp>
 inline constexpr bool IsProxyTypeV = IsProxyType<Tp>::value;
 
@@ -120,5 +126,25 @@ struct InterfaceTraits<Tp, Opt, std::enable_if_t<IsPairV<Tp>>> {
   using pointer = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::pointer;
   using reference = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::reference;
 };
+
+template <class Proxy, class Tp, class = std::enable_if_t<IsProxyTypeV<Proxy>>>
+Proxy MakeProxy(Tp&& value) {
+  if constexpr (IsObjectV<Proxy>) {
+    return GetReflection(&value);
+  } else if constexpr (IsNumberReferenceV<Proxy>) {
+    return value;  // implicit conversion applied
+  } else {
+    static_assert(IsPairV<Proxy>);
+    using first_type = typename PairTraits<Proxy>::first_type;
+    using second_type = typename PairTraits<Proxy>::second_type;
+    if constexpr (IsProxyTypeV<first_type> && IsProxyTypeV<second_type>) {
+      return Proxy{MakeProxy<first_type>(value.first), MakeProxy<first_type>(value.second)};
+    } else if constexpr (IsProxyTypeV<first_type>) {
+      return Proxy{MakeProxy<first_type>(value.first), value.second};
+    } else {
+      return Proxy{value.first, MakeProxy<second_type>(value.second)};
+    }
+  }
+}
 
 }  // namespace liteproto

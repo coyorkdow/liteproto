@@ -75,6 +75,19 @@ static_assert(has_insert_v<std::map<std::string, int>, std::pair<std::string, in
 static_assert(IsMapV<std::map<std::string, int>>);
 static_assert(IsMapV<std::unordered_map<std::string, int>>);
 
+using some_pair = std::pair<Object, double>;
+static_assert(std::is_same_v<typename InterfaceTraits<some_pair, ConstOption::CONST>::value_type, some_pair>);
+static_assert(std::is_same_v<typename InterfaceTraits<some_pair, ConstOption::CONST>::pointer, internal::DummyPointer>);
+static_assert(std::is_same_v<typename InterfaceTraits<some_pair, ConstOption::CONST>::reference, std::pair<Object, const double&>>);
+static_assert(std::is_same_v<typename InterfaceTraits<some_pair, ConstOption::NON_CONST>::reference, std::pair<Object, double&>>);
+
+using another_pair = std::pair<Number, Object>;
+static_assert(std::is_same_v<typename InterfaceTraits<another_pair, ConstOption::CONST>::pointer, internal::DummyPointer>);
+static_assert(std::is_same_v<typename InterfaceTraits<another_pair, ConstOption::CONST>::reference,
+                             std::pair<NumberReference<ConstOption::CONST>, Object>>);
+static_assert(std::is_same_v<typename InterfaceTraits<another_pair, ConstOption::NON_CONST>::reference,
+                             std::pair<NumberReference<ConstOption::NON_CONST>, Object>>);
+
 #if defined(__cpp_concepts)
 
 template <class I>
@@ -91,8 +104,7 @@ template <class I>
 concept LegacyInputIterator = LegacyIterator<I> && std::equality_comparable<I> && requires(I i) {
   typename std::incrementable_traits<I>::difference_type;
   typename std::indirectly_readable_traits<I>::value_type;
-  typename std::common_reference_t<std::iter_reference_t<I>&&,
-                                   typename std::indirectly_readable_traits<I>::value_type&>;
+  typename std::common_reference_t<std::iter_reference_t<I>&&, typename std::indirectly_readable_traits<I>::value_type&>;
   *i++;
   typename std::common_reference_t<decltype(*i++)&&, typename std::indirectly_readable_traits<I>::value_type&>;
   requires std::signed_integral<typename std::incrementable_traits<I>::difference_type>;
@@ -101,8 +113,7 @@ concept LegacyInputIterator = LegacyIterator<I> && std::equality_comparable<I> &
 template <class It>
 concept LegacyForwardIterator =
     LegacyInputIterator<It> && std::constructible_from<It> && std::is_reference_v<std::iter_reference_t<It>> &&
-    std::same_as<std::remove_cvref_t<std::iter_reference_t<It>>,
-                 typename std::indirectly_readable_traits<It>::value_type> &&
+    std::same_as<std::remove_cvref_t<std::iter_reference_t<It>>, typename std::indirectly_readable_traits<It>::value_type> &&
     requires(It it) {
       { it++ } -> std::convertible_to<const It&>;
       { *it++ } -> std::same_as<std::iter_reference_t<It>>;
