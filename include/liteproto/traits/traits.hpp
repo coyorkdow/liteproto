@@ -24,25 +24,28 @@ namespace liteproto {
 class Object;
 class Number;
 
+enum class ConstOption : bool { NON_CONST = false, CONST = true };
+
+template <ConstOption Opt>
+class NumberReference;
+
 namespace internal {
 
 template <class C, class V>
-inline constexpr bool is_list =
-    has_push_back_v<C, V> && has_pop_back_v<C> && has_size_v<C> && has_resize_v<C, V> && has_empty_v<C> &&
-    has_clear_v<C> && is_bidirectional_iterable_v<C> && has_insert_v<C, V> && has_erase_v<C>;
+inline constexpr bool is_list_v = has_push_back_v<C, V> && has_pop_back_v<C> && has_size_v<C> && has_resize_v<C, V> && has_empty_v<C> &&
+                                  has_clear_v<C> && is_bidirectional_iterable_v<C> && has_insert_v<C, V> && has_erase_v<C>;
 
 template <class Str, class Char>
-inline constexpr bool is_string =
-    is_list<Str, Char> && has_c_str_v<Str, Char> && has_append_v<Str, Char> && has_data_v<Str, char>;
+inline constexpr bool is_string_v = is_list_v<Str, Char> && has_c_str_v<Str, Char> && has_append_v<Str, Char> && has_data_v<Str, char>;
 
 template <class C, class V>
-inline constexpr bool is_array =
-    std::is_array_v<C> || (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> &&
-                           is_bidirectional_iterable_v<C>);
+inline constexpr bool is_array_v =
+    std::is_array_v<C> ||
+    (has_subscript_v<C, V> && (has_constexpr_size_v<C> || has_size_v<C>)&&has_data_v<C, V> && is_bidirectional_iterable_v<C>);
 
 template <class C, class K, class V>
-inline constexpr bool is_map = has_insert_v<C, std::pair<K, V>> && has_find_v<C, K, V> && has_size_v<C> &&
-                               has_empty_v<C> && has_clear_v<C> && has_erase_v<C> && is_forward_iterable_v<C>;
+inline constexpr bool is_map_v = has_insert_v<C, std::pair<K, V>> && has_find_v<C, K, V> && has_size_v<C> && has_empty_v<C> &&
+                                 has_clear_v<C> && has_erase_v<C> && is_forward_iterable_v<C>;
 
 }  // namespace internal
 
@@ -164,25 +167,25 @@ template <class Tp, class Cond = void>
 struct ListTraits {};
 
 template <template <class...> class C, class V, class... Tps>
-struct ListTraits<C<V, Tps...>, std::enable_if_t<internal::is_list<C<V, Tps...>, V>>> {
+struct ListTraits<C<V, Tps...>, std::enable_if_t<internal::is_list_v<C<V, Tps...>, V>>> {
   using container_type = C<V, Tps...>;
   using value_type = V;
 };
 
 template <template <class...> class C, class V, class... Tps>
-struct ListTraits<const C<V, Tps...>, std::enable_if_t<internal::is_list<C<V, Tps...>, V>>> {
+struct ListTraits<const C<V, Tps...>, std::enable_if_t<internal::is_list_v<C<V, Tps...>, V>>> {
   using container_type = const C<V, Tps...>;
   using value_type = V;
 };
 
 template <template <class, auto...> class C, class V, auto... Args>
-struct ListTraits<C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> {
+struct ListTraits<C<V, Args...>, std::enable_if_t<internal::is_list_v<C<V, Args...>, V>>> {
   using container_type = C<V, Args...>;
   using value_type = V;
 };
 
 template <template <class, auto...> class C, class V, auto... Args>
-struct ListTraits<const C<V, Args...>, std::enable_if_t<internal::is_list<C<V, Args...>, V>>> {
+struct ListTraits<const C<V, Args...>, std::enable_if_t<internal::is_list_v<C<V, Args...>, V>>> {
   using container_type = const C<V, Args...>;
   using value_type = V;
 };
@@ -191,17 +194,16 @@ template <class Tp, class Cond = void>
 struct IsList : std::false_type {};
 
 template <class Tp>
-struct IsList<Tp, std::void_t<typename ListTraits<Tp>::container_type, typename ListTraits<Tp>::value_type>>
-    : std::true_type {};
+struct IsList<Tp, std::void_t<typename ListTraits<Tp>::container_type, typename ListTraits<Tp>::value_type>> : std::true_type {};
 
 template <class Tp>
 inline constexpr bool IsListV = IsList<Tp>::value;
 
 template <class Str>
-struct IsString : std::bool_constant<internal::is_string<Str, char>> {};
+struct IsString : std::bool_constant<internal::is_string_v<Str, char>> {};
 
 template <class Str>
-struct IsString<const Str> : std::bool_constant<internal::is_string<Str, char>> {};
+struct IsString<const Str> : std::bool_constant<internal::is_string_v<Str, char>> {};
 
 template <class Str>
 inline constexpr bool IsStringV = IsString<Str>::value;
@@ -210,7 +212,7 @@ template <class C, class Cond = void>
 struct MapTraits {};
 
 template <template <class...> class C, class K, class V, class... Tps>
-struct MapTraits<C<K, V, Tps...>, std::enable_if_t<internal::is_map<C<K, V, Tps...>, K, V>>> {
+struct MapTraits<C<K, V, Tps...>, std::enable_if_t<internal::is_map_v<C<K, V, Tps...>, K, V>>> {
   using key_type = K;
   using mapped_type = V;
   using value_type = std::pair<const K, V>;
@@ -218,7 +220,7 @@ struct MapTraits<C<K, V, Tps...>, std::enable_if_t<internal::is_map<C<K, V, Tps.
 };
 
 template <template <class...> class C, class K, class V, class... Tps>
-struct MapTraits<const C<K, V, Tps...>, std::enable_if_t<internal::is_map<C<K, V, Tps...>, K, V>>> {
+struct MapTraits<const C<K, V, Tps...>, std::enable_if_t<internal::is_map_v<C<K, V, Tps...>, K, V>>> {
   using key_type = K;
   using mapped_type = V;
   using value_type = std::pair<const K, V>;
@@ -238,7 +240,7 @@ template <class Tp, class Cond = void>
 struct ArrayTraits : std::false_type {};
 
 template <template <class, size_t> class C, class V, size_t N>
-struct ArrayTraits<C<V, N>, std::enable_if_t<internal::is_array<C<V, N>, V>>> : std::true_type {
+struct ArrayTraits<C<V, N>, std::enable_if_t<internal::is_array_v<C<V, N>, V>>> : std::true_type {
   using container_type = C<V, N>;
   using value_type = V;
   static constexpr size_t size = N;
@@ -252,7 +254,7 @@ struct ArrayTraits<Tp[N]> : std::true_type {
 };
 
 template <template <class, size_t> class C, class V, size_t N>
-struct ArrayTraits<const C<V, N>, std::enable_if_t<internal::is_array<C<V, N>, V>>> : std::true_type {
+struct ArrayTraits<const C<V, N>, std::enable_if_t<internal::is_array_v<C<V, N>, V>>> : std::true_type {
   using container_type = const C<V, N>;
   using value_type = V;
   static constexpr size_t size = N;
@@ -269,8 +271,7 @@ template <class Tp, class Cond = void>
 struct IsArray : std::false_type {};
 
 template <class Tp>
-struct IsArray<Tp, std::void_t<typename ArrayTraits<Tp>::container_type, typename ArrayTraits<Tp>::value_type>>
-    : std::true_type {};
+struct IsArray<Tp, std::void_t<typename ArrayTraits<Tp>::container_type, typename ArrayTraits<Tp>::value_type>> : std::true_type {};
 
 template <class Tp>
 inline constexpr bool IsArrayV = IsArray<Tp>::value;
@@ -280,9 +281,9 @@ struct PairTraits {};
 
 template <class Pair>
 struct PairTraits<Pair, std::void_t<decltype(std::declval<Pair>().first), decltype(std::declval<Pair>().second)>> {
-  using first = decltype(std::declval<Pair>().first);
-  using second = decltype(std::declval<Pair>().second);
-  using value_type = std::pair<first, second>;
+  using first_type = decltype(std::declval<Pair>().first);
+  using second_type = decltype(std::declval<Pair>().second);
+  using value_type = Pair;
 };
 
 template <class Pair>
@@ -303,8 +304,9 @@ struct IsIndirectType : std::true_type {};
 template <>  // Object is indirect. We have to make is indirect so that our definition can be well-formed.
 struct IsIndirectType<Object> : std::true_type {};
 
-template <>
-struct IsIndirectType<void*> : std::false_type {};
+template <class Tp>
+struct IsIndirectType<Tp, std::enable_if_t<!std::is_const_v<Tp> && !std::is_volatile_v<Tp> && std::is_fundamental_v<Tp>>>
+    : std::false_type {};
 
 template <class Tp>
 struct IsIndirectType<const Tp> : IsIndirectType<Tp> {};
@@ -325,10 +327,93 @@ template <class Tp>
 struct IsIndirectType<Tp&&> : IsIndirectType<Tp> {};
 
 template <class Tp>
-struct IsIndirectType<Tp, std::enable_if_t<!std::is_const_v<Tp> && !std::is_volatile_v<Tp> && std::is_arithmetic_v<Tp>>>
-    : std::false_type {};
+inline constexpr bool IsIndirectTypeV = IsIndirectType<Tp>::value;
+
+namespace internal {
+struct Dummy;
+using DummyPointer = Dummy*;
+}  // namespace internal
+
+template <class Tp, class = void>
+struct ProxyType {
+  using type = Tp;
+};
 
 template <class Tp>
-inline constexpr bool IsIndirectTypeV = IsIndirectType<Tp>::value;
+struct ProxyType<Tp, std::enable_if_t<std::is_arithmetic_v<std::remove_reference_t<Tp>> && !is_char_v<std::remove_reference_t<Tp>>>> {
+  using type = Number;
+};
+
+template <class Tp>
+struct ProxyType<Tp, std::enable_if_t<IsIndirectTypeV<Tp>>> {
+  using type = Object;
+};
+
+template <class Tp>
+struct ProxyType<Tp, std::enable_if_t<IsPairV<Tp>>> {
+ private:
+  using underlying_first = typename PairTraits<Tp>::first_type;
+  using underlying_second = typename PairTraits<Tp>::second_type;
+
+ public:
+  using type = std::pair<typename ProxyType<underlying_first>::type, typename ProxyType<underlying_second>::type>;
+};
+
+template <class Tp>
+inline constexpr bool is_proxy_type_v = std::is_same_v<Tp, Object> || std::is_same_v<Tp, Number>;
+
+template <class Tp, ConstOption Opt, class Cond = void>
+struct InterfaceTraits {
+  using value_type = std::conditional_t<Opt == ConstOption::CONST, const Tp, Tp>;
+  using pointer = value_type*;
+  using reference = value_type&;
+};
+
+template <ConstOption Opt>
+struct InterfaceTraits<Object, Opt> {
+  using value_type = Object;
+  using pointer = internal::DummyPointer;
+  using reference = Object;
+};
+
+template <ConstOption Opt>
+struct InterfaceTraits<Number, Opt> {
+  using value_type = Number;
+  using pointer = internal::DummyPointer;
+  using reference = NumberReference<Opt>;
+};
+
+namespace details {
+
+template <class K, class V, ConstOption Opt, class Cond = void>
+struct InterfaceTraitsHelper;
+
+template <class K, class V>
+struct InterfaceTraitsHelper<K, V, ConstOption::NON_CONST> {
+  using pointer = std::pair<K, V>*;
+  using reference = std::pair<K, V>&;
+};
+
+template <class K, class V>
+struct InterfaceTraitsHelper<K, V, ConstOption::CONST> {
+  using pointer = const std::pair<K, V>*;
+  using reference = const std::pair<K, V>&;
+};
+
+template <class K, class V, ConstOption Opt>
+struct InterfaceTraitsHelper<K, V, Opt, std::enable_if_t<is_proxy_type_v<K> || is_proxy_type_v<V>>> {
+  using pointer = internal::DummyPointer;
+  using reference = std::pair<typename InterfaceTraits<K, Opt>::reference, typename InterfaceTraits<V, Opt>::reference>;
+};
+}  // namespace details
+
+template <class Tp, ConstOption Opt>
+struct InterfaceTraits<Tp, Opt, std::enable_if_t<IsPairV<Tp>>> {
+  using key_type = typename PairTraits<Tp>::first_type;
+  using mapped_type = typename PairTraits<Tp>::second_type;
+  using value_type = std::pair<std::conditional_t<is_proxy_type_v<key_type>, key_type, const key_type>, mapped_type>;
+  using pointer = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::pointer;
+  using reference = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::reference;
+};
 
 }  // namespace liteproto

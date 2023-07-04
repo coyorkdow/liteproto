@@ -134,6 +134,7 @@ TEST(TestString, basic) {
   using namespace liteproto;
   std::string stdstr;
   auto str = AsString(&stdstr);
+  static_assert(std::is_same_v<decltype(str), String<liteproto::ConstOption::NON_CONST>>);
   ASSERT_TRUE(str.empty());
   ASSERT_EQ(str.size(), 0);
   ASSERT_TRUE(str.begin() == str.end());
@@ -144,6 +145,16 @@ TEST(TestString, basic) {
 
   EXPECT_STRCASEEQ(str.c_str(), "123456789");
   EXPECT_STRCASEEQ(str.data(), "123456789");
+
+  const auto& cref = stdstr;
+  String<liteproto::ConstOption::CONST> cstr = AsString(&cref);
+  EXPECT_STRCASEEQ(cstr.c_str(), "123456789");
+  EXPECT_STRCASEEQ(cstr.data(), "123456789");
+  size_t cnt = 0;
+  for (char c : cstr) {
+    EXPECT_EQ(c, cnt++ + '1');
+  }
+  cstr = str;
 }
 
 void IterateObject(const liteproto::Object& obj) {

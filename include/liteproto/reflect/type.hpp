@@ -528,6 +528,4 @@ struct TypeMeta {
 
 inline const TypeDescriptor void_descriptor = TypeMeta<void>::GetDescriptor();
 
-enum class ConstOption : bool { NON_CONST = false, CONST = true };
-
 }  // namespace liteproto

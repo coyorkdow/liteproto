@@ -106,9 +106,6 @@ struct NumberInterfaceImpl {
 
 }  // namespace internal
 
-template <ConstOption Opt>
-class NumberReference;
-
 template <>
 class NumberReference<ConstOption::NON_CONST> {
  public:

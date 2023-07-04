@@ -13,22 +13,6 @@ namespace liteproto {
 
 namespace internal {
 
-template <class Tp, class = void>
-struct ProxyType {
-  using type = Tp;
-};
-
-template <class Tp>
-struct ProxyType<Tp, std::enable_if_t<std::is_arithmetic_v<std::remove_reference_t<Tp>> &&
-                                      !is_char_v<std::remove_reference_t<Tp>>>> {
-  using type = Number;
-};
-
-template <class Tp>
-struct ProxyType<Tp, std::enable_if_t<IsIndirectTypeV<Tp>>> {
-  using type = Object;
-};
-
 template <class Tp, class Pointer, class Reference,
           // We make the default arguments of the corresponding const interface the same as the original arguments.
           // That is because for all non-const interfaces, we will manually specify the const arguments.
@@ -95,9 +79,7 @@ struct StringInterface {
 };
 
 template <class K, class V>
-struct MapInterface {
-
-};
+struct MapInterface {};
 
 template <class Car, class Cdr>
 struct PairInterface {
@@ -316,8 +298,7 @@ decltype(auto) GetListInterface() noexcept {
   using const_value_type = typename Adapter::const_value_type;
   using const_pointer = typename Adapter::const_pointer;
   using const_reference = typename Adapter::const_reference;
-  using impl =
-      ListInterfaceImpl<Adapter, value_type, pointer, reference, const_value_type, const_pointer, const_reference>;
+  using impl = ListInterfaceImpl<Adapter, value_type, pointer, reference, const_value_type, const_pointer, const_reference>;
   return impl::GetInterface();
 }
 

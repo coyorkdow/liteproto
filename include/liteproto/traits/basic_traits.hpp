@@ -23,8 +23,7 @@ namespace details {
 using std::begin;
 using std::end;
 
-template <class C,
-          class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::size), const C>, size_t>>>
+template <class C, class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::size), const C>, size_t>>>
 auto HasSize(int) -> std::true_type;
 
 template <class>
@@ -46,15 +45,13 @@ auto HasReSize(int) -> std::true_type;
 template <class, class>
 auto HasReSize(float) -> std::false_type;
 
-template <class C, class = std::enable_if_t<
-                       std::is_convertible_v<std::invoke_result_t<decltype(&C::capacity), const C>, size_t>>>
+template <class C, class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::capacity), const C>, size_t>>>
 auto HasCapacity(int) -> std::true_type;
 
 template <class>
 auto HasCapacity(float) -> std::false_type;
 
-template <class C,
-          class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::empty), const C>, bool>>>
+template <class C, class = std::enable_if_t<std::is_convertible_v<std::invoke_result_t<decltype(&C::empty), const C>, bool>>>
 auto HasEmpty(int) -> std::true_type;
 
 template <class>
@@ -78,15 +75,13 @@ auto HasPopBack(int) -> std::true_type;
 template <class>
 auto HasPopBack(float) -> std::false_type;
 
-template <class C, class Char,
-          class = std::enable_if_t<std::is_same_v<const Char*, std::invoke_result_t<decltype(&C::c_str), const C>>>>
+template <class C, class Char, class = std::enable_if_t<std::is_same_v<const Char*, std::invoke_result_t<decltype(&C::c_str), const C>>>>
 auto HasCStr(int) -> std::true_type;
 
 template <class, class>
 auto HasCStr(float) -> std::false_type;
 
-template <class C, class Char,
-          class = decltype(std::declval<C>().append(std::declval<const Char*>(), std::declval<size_t>()))>
+template <class C, class Char, class = decltype(std::declval<C>().append(std::declval<const Char*>(), std::declval<size_t>()))>
 auto HasAppend(int) -> std::true_type;
 
 template <class, class>
@@ -109,22 +104,21 @@ auto HasFind(int) -> std::true_type;
 template <class C, class K, class V>
 auto HasFind(float) -> std::false_type;
 
-template <class It, class = std::enable_if_t<std::is_base_of_v<std::forward_iterator_tag,
-                                                               typename std::iterator_traits<It>::iterator_category>>>
+template <class It,
+          class = std::enable_if_t<std::is_base_of_v<std::forward_iterator_tag, typename std::iterator_traits<It>::iterator_category>>>
 auto IsForwardIterator(int) -> std::true_type;
 
 template <class>
 auto IsForwardIterator(float) -> std::false_type;
 
-template <class It, class = std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag,
-                                                               typename std::iterator_traits<It>::iterator_category>>>
+template <class It, class = std::enable_if_t<
+                        std::is_base_of_v<std::bidirectional_iterator_tag, typename std::iterator_traits<It>::iterator_category>>>
 auto IsBidirectionalIterator(int) -> std::true_type;
 
 template <class>
 auto IsBidirectionalIterator(float) -> std::false_type;
 
-template <class C, class It = decltype(begin(std::declval<C>())),
-          class = decltype(std::declval<C>().erase(std::declval<It>()))>
+template <class C, class It = decltype(begin(std::declval<C>())), class = decltype(std::declval<C>().erase(std::declval<It>()))>
 auto HasErase(int) -> std::true_type;
 
 template <class>
@@ -139,24 +133,21 @@ auto HasInsert(float) -> std::false_type;
 
 // For builtin array compatible. All traits about the iterable and subscript operator use reference in std::declval;
 
-template <class Tp, class = std::enable_if_t<
-                        std::is_same_v<decltype(begin(std::declval<Tp&>())), decltype(end(std::declval<Tp&>()))>>>
+template <class Tp, class = std::enable_if_t<std::is_same_v<decltype(begin(std::declval<Tp&>())), decltype(end(std::declval<Tp&>()))>>>
 auto IsForwardIterable(int) -> decltype(IsForwardIterator<decltype(begin(std::declval<Tp&>()))>(0));
 
 template <class>
 auto IsForwardIterable(float) -> std::false_type;
 
-template <class Tp, class = std::enable_if_t<
-                        std::is_same_v<decltype(begin(std::declval<Tp&>())), decltype(end(std::declval<Tp&>()))>>>
+template <class Tp, class = std::enable_if_t<std::is_same_v<decltype(begin(std::declval<Tp&>())), decltype(end(std::declval<Tp&>()))>>>
 auto IsBidirectionalIterable(int) -> decltype(IsBidirectionalIterator<decltype(begin(std::declval<Tp&>()))>(0));
 
 template <class>
 auto IsBidirectionalIterable(float) -> std::false_type;
 
 template <class C, class V,
-          class = std::enable_if_t<
-              std::is_convertible_v<decltype(std::declval<C&>()[std::declval<size_t>()]), V&> &&
-              std::is_convertible_v<decltype(std::declval<const C&>()[std::declval<size_t>()]), const V&>>>
+          class = std::enable_if_t<std::is_convertible_v<decltype(std::declval<C&>()[std::declval<size_t>()]), V&> &&
+                                   std::is_convertible_v<decltype(std::declval<const C&>()[std::declval<size_t>()]), const V&>>>
 auto HasSubscript(int) -> std::true_type;
 
 template <class, class>

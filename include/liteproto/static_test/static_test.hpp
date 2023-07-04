@@ -10,10 +10,13 @@
 namespace liteproto::internal_test {
 
 static_assert(IsPairV<std::pair<int, IsPair<void>>>);
+static_assert(IsPairV<const std::pair<int, float>>);
+static_assert(IsPairV<const std::pair<int, const float>>);
+static_assert(IsPairV<const std::pair<int, float&>>);
 static_assert(!IsPairV<void>);
 using p = std::pair<int, IsPair<void>>;
-static_assert(std::is_same_v<typename PairTraits<p>::first, int>);
-static_assert(std::is_same_v<typename PairTraits<p>::second, IsPair<void>>);
+static_assert(std::is_same_v<typename PairTraits<p>::first_type, int>);
+static_assert(std::is_same_v<typename PairTraits<p>::second_type, IsPair<void>>);
 
 static_assert(has_c_str_v<std::string, char>);
 static_assert(has_append_v<std::string, char>);
@@ -30,7 +33,7 @@ static_assert(has_subscript_v<int[1][2][3], int[2][3]>);
 static_assert(IsArrayV<int[1][2][3]>);
 static_assert(std::is_same_v<typename ArrayTraits<int[1][2][3]>::value_type, int[2][3]>);
 
-static_assert(internal::is_array<std::array<int, 6>, int>);
+static_assert(internal::is_array_v<std::array<int, 6>, int>);
 static_assert(IsArrayV<std::array<int, 6>>);
 static_assert(std::is_same_v<typename ArrayTraits<std::array<int, 0>>::value_type, int>);
 

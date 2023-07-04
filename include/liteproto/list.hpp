@@ -38,8 +38,7 @@ class List<Tp, ConstOption::NON_CONST> {
   using const_pointer = typename const_traits::pointer;
   using const_reference = typename const_traits::reference;
   using iterator = Iterator<value_type, pointer, reference>;
-  using interface =
-      internal::ListInterface<value_type, pointer, reference, const_value_type, const_pointer, const_reference>;
+  using interface = internal::ListInterface<value_type, pointer, reference, const_value_type, const_pointer, const_reference>;
 
   void push_back(const Tp& v) const { interface_->push_back(obj_, v); }
   void push_back(Tp&& v) const { interface_->emplace_back(obj_, std::move(v)); }
@@ -68,8 +67,7 @@ class List<Tp, ConstOption::NON_CONST> {
 
  protected:
   template <class Adapter>
-  List(Adapter&& adapter, const interface& interface) noexcept
-      : obj_(std::forward<Adapter>(adapter)), interface_(&interface) {
+  List(Adapter&& adapter, const interface& interface) noexcept : obj_(std::forward<Adapter>(adapter)), interface_(&interface) {
     static_assert(IsListV<List>, "Why the List<Tp, ConstOption::NON_CONST> itself is not a List?");
     static_assert(std::is_nothrow_move_constructible_v<List>);
   }
@@ -122,8 +120,7 @@ class List<Tp, ConstOption::CONST> {
 
  protected:
   template <class Adapter>
-  List(Adapter&& adapter, const interface& interface) noexcept
-      : obj_(std::forward<Adapter>(adapter)), interface_(&interface) {}
+  List(Adapter&& adapter, const interface& interface) noexcept : obj_(std::forward<Adapter>(adapter)), interface_(&interface) {}
 
   std::any obj_;
   const interface* interface_;

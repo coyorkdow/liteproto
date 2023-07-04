@@ -13,11 +13,6 @@
 
 namespace liteproto {
 
-namespace internal {
-struct Dummy;
-using DummyPointer = Dummy*;
-}  // namespace internal
-
 template <class Tp, class Pointer, class Reference, class Category = std::bidirectional_iterator_tag>
 class Iterator;
 
@@ -33,39 +28,7 @@ using NumberIterator = Iterator<Number, internal::DummyPointer, NumberReference<
 template <class Category = std::bidirectional_iterator_tag>
 using ConstNumberIterator = Iterator<Number, internal::DummyPointer, NumberReference<ConstOption::CONST>, Category>;
 
-template <class Tp, ConstOption Opt>
-struct InterfaceTraits {
-  using value_type = std::conditional_t<Opt == ConstOption::CONST, const Tp, Tp>;
-  using pointer = value_type*;
-  using reference = value_type&;
-};
-
-template <ConstOption Opt>
-struct InterfaceTraits<Object, Opt> {
-  using value_type = Object;
-  using pointer = internal::DummyPointer;
-  using reference = Object;
-};
-
-template <ConstOption Opt>
-struct InterfaceTraits<Number, Opt> {
-  using value_type = Number;
-  using pointer = internal::DummyPointer;
-  using reference = NumberReference<Opt>;
-};
-
-template <ConstOption Opt>
-struct InterfaceTraits<const Number, Opt> {
-  using value_type = Number;
-  using pointer = internal::DummyPointer;
-  using reference = NumberReference<Opt>;
-};
-
 namespace internal {
-
-template <class Tp>
-inline constexpr bool is_proxy_type_v =
-    std::is_same_v<Tp, Object> || std::is_same_v<Tp, Number> || std::is_same_v<Tp, const Number>;
 
 template <class Container, class Tp, class Pointer, class Reference>
 class IteratorAdapter;
@@ -92,7 +55,7 @@ struct IteratorInterface {
   adapter_type_id_t* adapter_type_id;
 };
 
-template <class IteratorAdapter, class Tp, class Pointer, class Reference>
+template <class IteratorAdapter, class Tp, class Pointer, class Reference, class Category = std::bidirectional_iterator_tag>
 auto MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp, Pointer, Reference>& inter);
 
 template <class Tp, class Pointer, class Reference, class Category>
@@ -160,7 +123,7 @@ class IteratorBase {
 
 template <class Tp, class Pointer, class Reference, class Category>
 class Iterator : public IteratorBase<Tp, Pointer, Reference, Category> {
-  template <class IteratorAdapter, class T, class P, class R>
+  template <class IteratorAdapter, class T, class P, class R, class C>
   friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R>& inter);
 
   template <class T, class P, class R, class C>
@@ -195,9 +158,8 @@ class Iterator : public IteratorBase<Tp, Pointer, Reference, Category> {
 };
 
 template <class Tp, class Reference, class Category>
-class Iterator<Tp, internal::DummyPointer, Reference, Category>
-    : public IteratorBase<Tp, internal::DummyPointer, Reference, Category> {
-  template <class IteratorAdapter, class T, class P, class R>
+class Iterator<Tp, internal::DummyPointer, Reference, Category> : public IteratorBase<Tp, internal::DummyPointer, Reference, Category> {
+  template <class IteratorAdapter, class T, class P, class R, class C>
   friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R>& inter);
 
   template <class T, class P, class R, class C>
@@ -232,9 +194,9 @@ class Iterator<Tp, internal::DummyPointer, Reference, Category>
 
 namespace internal {
 
-template <class IteratorAdapter, class Tp, class Pointer, class Reference>
+template <class IteratorAdapter, class Tp, class Pointer, class Reference, class Category>
 auto MakeIterator(IteratorAdapter&& it, const IteratorInterface<Tp, Pointer, Reference>& inter) {
-  return Iterator<Tp, Pointer, Reference>(std::forward<IteratorAdapter>(it), inter);
+  return Iterator<Tp, Pointer, Reference, Category>(std::forward<IteratorAdapter>(it), inter);
 }
 
 template <class Tp, class Pointer, class Reference, class Category>
@@ -291,8 +253,7 @@ struct IteratorInterfaceImpl {
 };
 
 template <class It>
-const IteratorInterface<typename It::value_type, typename It::pointer, typename It::reference>&
-GetIteratorInterface() noexcept {
+const IteratorInterface<typename It::value_type, typename It::pointer, typename It::reference>& GetIteratorInterface() noexcept {
   using value_type = typename It::value_type;
   using pointer = typename It::pointer;
   using reference = typename It::reference;
@@ -330,8 +291,8 @@ class IteratorAdapter {
   static_assert(is_proxy_type_v<value_type> || std::is_reference_v<reference>,
                 "IteratorAdapter uses reference_or_value for all types except Object or Number");
   using container_type = Container;
-  using wrapped_iterator = std::conditional_t<std::is_const_v<container_type>, typename container_type::const_iterator,
-                                              typename container_type::iterator>;
+  using wrapped_iterator =
+      std::conditional_t<std::is_const_v<container_type>, typename container_type::const_iterator, typename container_type::iterator>;
 
   explicit IteratorAdapter(const wrapped_iterator& it) noexcept : it_(it) {
     static_assert(is_proxy_type_v<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
