@@ -277,7 +277,8 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
     return internal::MakeIterator(std::move(it_adapter), GetIteratorInterface<decltype(it_adapter)>());
   }
 
-  iterator insert(iterator pos, const value_type& v) const {
+  template <class Value>
+  iterator insert(iterator pos, Value&& v) const {
     if constexpr (std::is_const_v<container_type>) {
       // If the container is const, do nothing. And it's assured that this method will never be called.
     } else {
@@ -287,12 +288,14 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
         return end();
       }
       if constexpr (IsObjectV<value_type>) {
+        static_assert(IsObjectV<std::remove_reference_t<Value>>);
         auto v_ptr = ObjectCast<underlying_value_type>(v);
         if (v_ptr != nullptr) {
           // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
           rhs_it->InsertMyself(container_, std::move(*v_ptr));
         }
       } else if constexpr (IsNumberV<value_type>) {
+        static_assert(IsNumberV<std::remove_reference_t<Value>>);
         if (v.IsSignedInteger()) {
           rhs_it->InsertMyself(container_, v.AsInt64());
         } else if (v.IsUnsigned()) {
@@ -301,7 +304,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
           rhs_it->InsertMyself(container_, v.AsFloat64());
         }
       } else {
-        rhs_it->InsertMyself(container_, v);
+        rhs_it->InsertMyself(container_, std::forward<Value>(v));
         return pos;
       }
     }

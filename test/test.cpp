@@ -199,12 +199,12 @@ TEST(TestList, ListOfString) {
   EXPECT_EQ(anol.size(), 0);
   _ = "new str";
   list.insert(list.begin(), GetReflection(&_));
-  EXPECT_TRUE((*list.begin()).IsString<ConstOption::NON_CONST>());
+  EXPECT_TRUE(StringCast<ConstOption::NON_CONST>(*list.begin()).has_value());
   const_list = list;  // is const
   auto csit = const_list.begin();
   static_assert(std::is_same_v<decltype(csit), decltype(const_list.end())>);
-  EXPECT_FALSE((*csit).IsString<ConstOption::NON_CONST>());
-  EXPECT_TRUE((*csit).IsString<ConstOption::CONST>());
+  EXPECT_FALSE(StringCast<ConstOption::NON_CONST>(*csit).has_value());
+  EXPECT_TRUE(StringCast<ConstOption::CONST>(*csit).has_value());
   EXPECT_STREQ(StringCast<ConstOption::CONST>(*const_list.begin())->c_str(), "new str");
 }
 
@@ -240,21 +240,17 @@ void IterateObject(const liteproto::Object& obj) {
   auto descriptor = obj.Descriptor();
   if (descriptor.KindEnum() == Kind::LIST) {
     descriptor = descriptor.ValueType();
-    if (obj.IsList<Number, ConstOption::NON_CONST>()) {
+    if (auto number_list = ListCast<Number, ConstOption::NON_CONST>(obj); number_list.has_value()) {
       EXPECT_EQ(descriptor.KindEnum(), Kind::NUMBER);
-      auto list = ListCast<Number>(obj);
-      ASSERT_TRUE(list.has_value());
       for (int i = 0; i < 10; i++) {
-        list->push_back(i);
+        number_list->push_back(i);
       }
-    } else if (obj.IsList<Object, ConstOption::NON_CONST>()) {
-      auto list = ListCast<Object>(obj);
-      ASSERT_TRUE(list.has_value());
+    } else if (auto object_list = ListCast<Object, ConstOption::NON_CONST>(obj); object_list.has_value()) {
       for (int i = 0; i < 5; i++) {
         auto [new_obj, data] = descriptor.DefaultValue();
         ASSERT_FALSE(new_obj.empty());
-        list->push_back(new_obj);
-        IterateObject((*list)[list->size() - 1]);
+        object_list->push_back(new_obj);
+        IterateObject((*object_list)[object_list->size() - 1]);
       }
     }
   }
