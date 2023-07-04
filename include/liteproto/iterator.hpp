@@ -304,10 +304,9 @@ class IteratorAdapter {
   }
 
   reference operator*() const noexcept(noexcept(*it_)) {
-    if constexpr (IsObjectV<value_type>) {
-      return GetReflection(&(*it_));
+    if constexpr (IsProxyTypeV<reference>) {
+      return MakeProxy<reference>(*it_);
     } else {
-      // number can implicitly convert to NumberReference
       return *it_;
     }
   }

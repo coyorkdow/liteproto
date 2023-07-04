@@ -221,8 +221,8 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
     using std::begin;
     auto it = begin(*container_);
     std::advance(it, pos);
-    if constexpr (std::is_same_v<value_type, Object>) {
-      return GetReflection(&(*it));
+    if constexpr (IsProxyTypeV<reference>) {
+      return MakeProxy<reference>(*it);
     } else {
       return *it;
     }
