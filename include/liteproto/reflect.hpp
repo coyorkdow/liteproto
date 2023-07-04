@@ -11,6 +11,7 @@
 #include "liteproto/reflect/number.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
+#include "liteproto/reflect/proxy.hpp"
 #include "liteproto/string.hpp"
 #include "liteproto/traits/traits.hpp"
 

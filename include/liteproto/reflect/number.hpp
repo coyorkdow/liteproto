@@ -10,7 +10,7 @@ namespace liteproto {
 
 class Number {
  public:
-  Number() noexcept : uint64_(0), descriptor_(&TypeMeta<uint64_t>::GetDescriptor()) {}
+  Number() noexcept : uint64_(0), descriptor_(&TypeMeta<uint64_t>::GetDescriptor()) { static_assert(std::is_trivially_copyable_v<Number>); }
 
   template <class Arithmetic, class = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
   Number(Arithmetic v) noexcept : uint64_(0), descriptor_(&TypeMeta<Arithmetic>::GetDescriptor()) {
@@ -39,9 +39,21 @@ class Number {
     float64_ = v;
     descriptor_ = &TypeMeta<double>::GetDescriptor();
   }
+
   int64_t AsInt64() const noexcept { return int64_; }
   uint64_t AsUInt64() const noexcept { return uint64_; }
   double AsFloat64() const noexcept { return float64_; }
+
+  template <class Arithmetic, class = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
+  explicit operator Arithmetic() const noexcept {
+    if constexpr (std::is_floating_point_v<Arithmetic>) {
+      return static_cast<Arithmetic>(AsFloat64());
+    } else if constexpr (std::is_signed_v<Arithmetic>) {
+      return static_cast<Arithmetic>(AsInt64());
+    } else {
+      return static_cast<Arithmetic>(AsUInt64());
+    }
+  }
 
   const TypeDescriptor& Descriptor() const noexcept { return *descriptor_; }
 
@@ -64,6 +76,7 @@ struct NumberInterface {
   using as_int64_t = int64_t(const void*) noexcept;
   using as_uint64_t = uint64_t(const void*) noexcept;
   using as_float64_t = double(const void*) noexcept;
+  using descriptor_t = const TypeDescriptor&(const void*) noexcept;
 
   set_int64_t* set_int64;
   set_uint64_t* set_uint64;
@@ -71,9 +84,10 @@ struct NumberInterface {
   as_int64_t* as_int64;
   as_uint64_t* as_uint64;
   as_float64_t* as_float64;
+  descriptor_t* descriptor;
 };
 
-template <class Tp>
+template <class Tp, class Cond = void>
 struct NumberInterfaceImpl {
   template <class V>
   static void Set(void* ptr, V v) noexcept {
@@ -89,7 +103,18 @@ struct NumberInterfaceImpl {
     return static_cast<V>(*number);
   }
 
+  static const TypeDescriptor& Descriptor(const void* ptr) noexcept {
+    if constexpr (IsNumberV<Tp> || IsNumberReferenceV<Tp>) {
+      auto number = static_cast<const Tp*>(ptr);
+      return number->Descriptor();
+    } else {
+      return TypeMeta<Tp>::GetDescriptor();
+    }
+  }
+
   static const NumberInterface& MakeNumberInterface() {
+    static_assert(!std::is_reference_v<Tp>);
+    static_assert(std::is_arithmetic_v<Tp> || IsNumberV<Tp> || IsNumberReferenceV<Tp>);
     static const NumberInterface inter = [&] {
       NumberInterface interface {};
       interface.set_int64 = &Set<int64_t>;
@@ -98,6 +123,7 @@ struct NumberInterfaceImpl {
       interface.as_int64 = &As<int64_t>;
       interface.as_uint64 = &As<uint64_t>;
       interface.as_float64 = &As<double>;
+      interface.descriptor = &Descriptor;
       return interface;
     }();
     return inter;
@@ -108,10 +134,14 @@ struct NumberInterfaceImpl {
 
 template <>
 class NumberReference<ConstOption::NON_CONST> {
+  friend class NumberReference<ConstOption::CONST>;
+
  public:
-  template <class Tp, class = std::enable_if_t<std::is_arithmetic_v<std::remove_reference_t<Tp>>>>
-  NumberReference(Tp&& v)
-      : ptr_(&v), interface_(&internal::NumberInterfaceImpl<std::remove_reference_t<Tp>>::MakeNumberInterface()) {}
+  template <class Tp,
+            std::enable_if_t<std::is_arithmetic_v<std::remove_reference_t<Tp>> || IsNumberV<std::remove_reference_t<Tp>>, int> = 0>
+  NumberReference(Tp&& v) : ptr_(&v), interface_(&internal::NumberInterfaceImpl<std::remove_reference_t<Tp>>::MakeNumberInterface()) {
+    static_assert(std::is_trivially_copyable_v<NumberReference>);
+  }
 
   void SetInt64(int64_t v) noexcept { interface_->set_int64(ptr_, v); }
   void SetUInt64(uint64_t v) noexcept { interface_->set_uint64(ptr_, v); }
@@ -119,6 +149,22 @@ class NumberReference<ConstOption::NON_CONST> {
   int64_t AsInt64() const noexcept { return interface_->as_int64(ptr_); }
   uint64_t AsUInt64() const noexcept { return interface_->as_uint64(ptr_); }
   double AsFloat64() const noexcept { return interface_->as_float64(ptr_); }
+
+  template <class Arithmetic, class = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
+  explicit operator Arithmetic() const noexcept {
+    if constexpr (std::is_floating_point_v<Arithmetic>) {
+      return static_cast<Arithmetic>(AsFloat64());
+    } else if constexpr (std::is_signed_v<Arithmetic>) {
+      return static_cast<Arithmetic>(AsInt64());
+    } else {
+      return static_cast<Arithmetic>(AsUInt64());
+    }
+  }
+
+  const TypeDescriptor& Descriptor() const noexcept { return interface_->descriptor(ptr_); }
+  bool IsSignedInteger() const noexcept { return Descriptor().Traits(traits::is_signed); }
+  bool IsUnsigned() const noexcept { return Descriptor().Traits(traits::is_unsigned); }
+  bool IsFloating() const noexcept { return Descriptor().Traits(traits::is_floating_point); }
 
  private:
   void* ptr_;
@@ -128,13 +174,34 @@ class NumberReference<ConstOption::NON_CONST> {
 template <>
 class NumberReference<ConstOption::CONST> {
  public:
-  template <class Tp, class = std::enable_if_t<std::is_arithmetic_v<Tp>>>
-  NumberReference(const Tp& v)
-      : ptr_(&v), interface_(&internal::NumberInterfaceImpl<const Tp>::MakeNumberInterface()) {}
+  template <class Tp, std::enable_if_t<std::is_arithmetic_v<Tp> || IsNumberV<Tp>, int> = 0>
+  NumberReference(const Tp& v) noexcept : ptr_(&v), interface_(&internal::NumberInterfaceImpl<const Tp>::MakeNumberInterface()) {
+    static_assert(std::is_trivially_copyable_v<NumberReference>);
+  }
+
+  NumberReference(const NumberReference<ConstOption::NON_CONST>& v) noexcept : ptr_(v.ptr_), interface_(v.interface_) {
+    static_assert(std::is_trivially_copyable_v<NumberReference>);
+  }
 
   int64_t AsInt64() const noexcept { return interface_->as_int64(ptr_); }
   uint64_t AsUInt64() const noexcept { return interface_->as_uint64(ptr_); }
   double AsFloat64() const noexcept { return interface_->as_float64(ptr_); }
+
+  template <class Arithmetic, class = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
+  explicit operator Arithmetic() const noexcept {
+    if constexpr (std::is_floating_point_v<Arithmetic>) {
+      return static_cast<Arithmetic>(AsFloat64());
+    } else if constexpr (std::is_signed_v<Arithmetic>) {
+      return static_cast<Arithmetic>(AsInt64());
+    } else {
+      return static_cast<Arithmetic>(AsUInt64());
+    }
+  }
+
+  const TypeDescriptor& Descriptor() const noexcept { return interface_->descriptor(ptr_); }
+  bool IsSignedInteger() const noexcept { return Descriptor().Traits(traits::is_signed); }
+  bool IsUnsigned() const noexcept { return Descriptor().Traits(traits::is_unsigned); }
+  bool IsFloating() const noexcept { return Descriptor().Traits(traits::is_floating_point); }
 
  private:
   const void* ptr_;

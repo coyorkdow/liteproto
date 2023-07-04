@@ -163,6 +163,20 @@ struct IsNumber<const volatile Number> : std::true_type {};
 template <class Tp>
 inline constexpr bool IsNumberV = IsNumber<Tp>::value;
 
+template <class Tp>
+struct IsNumberReference : std::false_type {};
+template <ConstOption Opt>
+struct IsNumberReference<NumberReference<Opt>> : std::true_type {};
+template <ConstOption Opt>
+struct IsNumberReference<const NumberReference<Opt>> : std::true_type {};
+template <ConstOption Opt>
+struct IsNumberReference<volatile NumberReference<Opt>> : std::true_type {};
+template <ConstOption Opt>
+struct IsNumberReference<const volatile NumberReference<Opt>> : std::true_type {};
+
+template <class Tp>
+inline constexpr bool IsNumberReferenceV = IsNumberReference<Tp>::value;
+
 template <class Tp, class Cond = void>
 struct ListTraits {};
 
@@ -298,11 +312,19 @@ struct IsPair<Pair, std::void_t<typename PairTraits<Pair>::value_type>> : std::t
 template <class Pair>
 inline constexpr bool IsPairV = IsPair<Pair>::value;
 
+// All the indirect type should be proxied by Object when reflecting.
+
 template <class Tp, class = void>
 struct IsIndirectType : std::true_type {};
 
 template <>  // Object is indirect. We have to make is indirect so that our definition can be well-formed.
 struct IsIndirectType<Object> : std::true_type {};
+
+template <>  // Number is non-indirect. So that a Number object will still be proxies as another Number object.
+struct IsIndirectType<Number> : std::false_type {};
+
+template <ConstOption Opt>
+struct IsIndirectType<NumberReference<Opt>> : std::false_type {};
 
 template <class Tp>
 struct IsIndirectType<Tp, std::enable_if_t<!std::is_const_v<Tp> && !std::is_volatile_v<Tp> && std::is_fundamental_v<Tp>>>
@@ -328,92 +350,5 @@ struct IsIndirectType<Tp&&> : IsIndirectType<Tp> {};
 
 template <class Tp>
 inline constexpr bool IsIndirectTypeV = IsIndirectType<Tp>::value;
-
-namespace internal {
-struct Dummy;
-using DummyPointer = Dummy*;
-}  // namespace internal
-
-template <class Tp, class = void>
-struct ProxyType {
-  using type = Tp;
-};
-
-template <class Tp>
-struct ProxyType<Tp, std::enable_if_t<std::is_arithmetic_v<std::remove_reference_t<Tp>> && !is_char_v<std::remove_reference_t<Tp>>>> {
-  using type = Number;
-};
-
-template <class Tp>
-struct ProxyType<Tp, std::enable_if_t<IsIndirectTypeV<Tp>>> {
-  using type = Object;
-};
-
-template <class Tp>
-struct ProxyType<Tp, std::enable_if_t<IsPairV<Tp>>> {
- private:
-  using underlying_first = typename PairTraits<Tp>::first_type;
-  using underlying_second = typename PairTraits<Tp>::second_type;
-
- public:
-  using type = std::pair<typename ProxyType<underlying_first>::type, typename ProxyType<underlying_second>::type>;
-};
-
-template <class Tp>
-inline constexpr bool is_proxy_type_v = std::is_same_v<Tp, Object> || std::is_same_v<Tp, Number>;
-
-template <class Tp, ConstOption Opt, class Cond = void>
-struct InterfaceTraits {
-  using value_type = std::conditional_t<Opt == ConstOption::CONST, const Tp, Tp>;
-  using pointer = value_type*;
-  using reference = value_type&;
-};
-
-template <ConstOption Opt>
-struct InterfaceTraits<Object, Opt> {
-  using value_type = Object;
-  using pointer = internal::DummyPointer;
-  using reference = Object;
-};
-
-template <ConstOption Opt>
-struct InterfaceTraits<Number, Opt> {
-  using value_type = Number;
-  using pointer = internal::DummyPointer;
-  using reference = NumberReference<Opt>;
-};
-
-namespace details {
-
-template <class K, class V, ConstOption Opt, class Cond = void>
-struct InterfaceTraitsHelper;
-
-template <class K, class V>
-struct InterfaceTraitsHelper<K, V, ConstOption::NON_CONST> {
-  using pointer = std::pair<K, V>*;
-  using reference = std::pair<K, V>&;
-};
-
-template <class K, class V>
-struct InterfaceTraitsHelper<K, V, ConstOption::CONST> {
-  using pointer = const std::pair<K, V>*;
-  using reference = const std::pair<K, V>&;
-};
-
-template <class K, class V, ConstOption Opt>
-struct InterfaceTraitsHelper<K, V, Opt, std::enable_if_t<is_proxy_type_v<K> || is_proxy_type_v<V>>> {
-  using pointer = internal::DummyPointer;
-  using reference = std::pair<typename InterfaceTraits<K, Opt>::reference, typename InterfaceTraits<V, Opt>::reference>;
-};
-}  // namespace details
-
-template <class Tp, ConstOption Opt>
-struct InterfaceTraits<Tp, Opt, std::enable_if_t<IsPairV<Tp>>> {
-  using key_type = typename PairTraits<Tp>::first_type;
-  using mapped_type = typename PairTraits<Tp>::second_type;
-  using value_type = std::pair<std::conditional_t<is_proxy_type_v<key_type>, key_type, const key_type>, mapped_type>;
-  using pointer = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::pointer;
-  using reference = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::reference;
-};
 
 }  // namespace liteproto

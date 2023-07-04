@@ -10,6 +10,7 @@
 #include "liteproto/reflect/number.hpp"
 #include "liteproto/reflect/object.hpp"
 #include "liteproto/reflect/type.hpp"
+#include "liteproto/reflect/proxy.hpp"
 
 namespace liteproto {
 
@@ -288,14 +289,14 @@ class IteratorAdapter {
   // We don't store any additional data in the adapter. Instead, the Object returned by adapter is created when the
   // corresponding method is called. Therefore, the return type of indirection operator is value type, not
   // reference_or_value type.
-  static_assert(is_proxy_type_v<value_type> || std::is_reference_v<reference>,
+  static_assert(IsProxyTypeV<value_type> || std::is_reference_v<reference>,
                 "IteratorAdapter uses reference_or_value for all types except Object or Number");
   using container_type = Container;
   using wrapped_iterator =
       std::conditional_t<std::is_const_v<container_type>, typename container_type::const_iterator, typename container_type::iterator>;
 
   explicit IteratorAdapter(const wrapped_iterator& it) noexcept : it_(it) {
-    static_assert(is_proxy_type_v<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
+    static_assert(IsProxyTypeV<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
                   std::is_same_v<value_type, const typename container_type::value_type>);
     static_assert(std::is_copy_constructible<IteratorAdapter>::value);
     static_assert(std::is_copy_assignable<IteratorAdapter>::value);
@@ -312,7 +313,7 @@ class IteratorAdapter {
   }
 
   pointer operator->() const {
-    if constexpr (!is_proxy_type_v<value_type>) {
+    if constexpr (!IsProxyTypeV<value_type>) {
       return it_.operator->();
     } else {
       // If the value_type is Object or Number, do nothing. And it's assured that this method will never be called.

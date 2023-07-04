@@ -5,6 +5,7 @@
 #include <cassert>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <tuple>
 #include <type_traits>
 
@@ -16,6 +17,83 @@
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+
+TEST(TestNumber, Basic) {
+  using namespace liteproto;
+  Number n;
+  n = static_cast<Number>(1);
+  EXPECT_EQ(n.Descriptor().TypeEnum(), Type::INT32);
+  EXPECT_TRUE(n.IsSignedInteger());
+  EXPECT_EQ(n.AsInt64(), 1);
+  EXPECT_EQ(static_cast<int64_t>(n), 1);
+  n = 3.14159;
+  EXPECT_TRUE((n.Descriptor().TypeEnum() == Type::FLOAT32) || (n.Descriptor().TypeEnum() == Type::FLOAT64));
+  EXPECT_EQ(n.Descriptor().KindEnum(), Kind::NUMBER);
+  EXPECT_TRUE(n.IsFloating());
+  EXPECT_DOUBLE_EQ(n.AsFloat64(), 3.14159);
+  EXPECT_DOUBLE_EQ(static_cast<double>(n), 3.14159);
+  n = std::numeric_limits<int32_t>::min();
+  EXPECT_EQ(n.Descriptor().TypeEnum(), Type::INT32);
+  EXPECT_EQ(n.AsInt64(), std::numeric_limits<int32_t>::min());
+  EXPECT_EQ(static_cast<int64_t>(n), std::numeric_limits<int32_t>::min());
+  n = std::numeric_limits<uint32_t>::max();
+  EXPECT_EQ(n.Descriptor().TypeEnum(), Type::UINT32);
+  EXPECT_TRUE(n.IsUnsigned());
+  EXPECT_EQ(n.AsUInt64(), std::numeric_limits<uint32_t>::max());
+  EXPECT_EQ(static_cast<uint64_t>(n), std::numeric_limits<uint32_t>::max());
+
+  n = static_cast<char>('v');
+  EXPECT_EQ(n.Descriptor().KindEnum(), Kind::CHAR);
+  EXPECT_EQ(n.AsInt64(), 'v');
+
+  Number ano = n;
+  EXPECT_EQ(ano.Descriptor().KindEnum(), Kind::CHAR);
+  EXPECT_EQ(ano.AsInt64(), 'v');
+}
+
+TEST(TestNumber, Reference) {
+  using namespace liteproto;
+  Number n;
+  n = static_cast<Number>(1);
+  NumberReference ref = n;
+  ref.SetFloat64(3.14159);
+  EXPECT_DOUBLE_EQ(static_cast<double>(n), 3.14159);
+  const Number& cref_of_n = n;
+  NumberReference cref = cref_of_n;
+  EXPECT_DOUBLE_EQ(static_cast<double>(cref), 3.14159);
+}
+
+TEST(TestNumber, NumberIsNumber) {
+  using namespace liteproto;
+  std::vector<Number> nums;
+  for (int i = 0; i < 3; i++) {
+    nums.emplace_back(i);
+  }
+  auto list = AsList(&nums);
+  static_assert(std::is_same_v<decltype(list), List<Number, ConstOption::NON_CONST>>);
+  for (auto it = list.begin(); it != list.end(); it++) {
+    (*it).SetInt64(123);
+  }
+  for (auto i : nums) {
+    EXPECT_EQ(static_cast<int64_t>(i), 123);
+  }
+  std::vector<NumberReference<ConstOption::CONST>> refs;
+  for (auto& i : nums) {
+    refs.emplace_back(i);
+  }
+  for (auto i : list) {
+    refs.emplace_back(i);
+  }
+  for (auto& i : refs) {
+    EXPECT_EQ(i.AsInt64(), 123);
+  }
+  for (int i = 0; i < 3; i++) {
+    nums[i] = i + 3;
+    EXPECT_EQ(list[i].AsInt64(), i + 3);
+    EXPECT_EQ(refs[i].AsInt64(), i + 3);
+    EXPECT_EQ(refs[i + 3].AsInt64(), i + 3);
+  }
+}
 
 TEST(TestList, Basic) {
   using namespace liteproto;
