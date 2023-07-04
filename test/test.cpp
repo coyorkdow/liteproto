@@ -317,12 +317,13 @@ TEST(TestMsgFundamenal, basic) {
   auto& names = decltype(msg)::FieldsName();
   for (auto& [i, name] : names) {
     EXPECT_TRUE(i == 1 || i == 2 || i == 3);
-    if (i == 1)
+    if (i == 1) {
       EXPECT_EQ(name, "foo");
-    else if (i == 2)
+    } else if (i == 2) {
       EXPECT_EQ(name, "bar");
-    else if (i == 3)
+    } else if (i == 3) {
       EXPECT_EQ(name, "baz");
+    }
   }
 }
 
