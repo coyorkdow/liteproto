@@ -43,11 +43,11 @@ TEST(TestNumber, Basic) {
   EXPECT_EQ(static_cast<uint64_t>(n), std::numeric_limits<uint32_t>::max());
 
   n = static_cast<char>('v');
-  EXPECT_EQ(n.Descriptor().KindEnum(), Kind::CHAR);
+  EXPECT_EQ(n.Descriptor().KindEnum(), Kind::NUMBER);
   EXPECT_EQ(n.AsInt64(), 'v');
 
   Number ano = n;
-  EXPECT_EQ(ano.Descriptor().KindEnum(), Kind::CHAR);
+  EXPECT_EQ(ano.Descriptor().KindEnum(), Kind::NUMBER);
   EXPECT_EQ(ano.AsInt64(), 'v');
 }
 
@@ -152,6 +152,11 @@ TEST(TestList, Basic) {
   for (auto i : de) {
     EXPECT_EQ(i, 123);
   }
+
+  std::vector<char> cv;
+  list = AsList(&cv);
+  list.push_back('a');
+  EXPECT_EQ(cv[0], 'a');
 }
 
 TEST(TestList, ListOfString) {
@@ -205,6 +210,12 @@ TEST(TestList, ListOfString) {
   }
 
   auto it = list.begin();
+  auto string = StringCast<ConstOption::NON_CONST>(*it);
+  ASSERT_TRUE(string.has_value());
+  string->clear();
+  string->append("123456789");
+  string->insert(string->begin(), '0');
+  EXPECT_STRCASEEQ(strlist.begin()->c_str(), "0123456789");
   static_assert(std::is_same_v<decltype(it), ObjectIterator<>>);
   std::list<std::string> anol;
   list = AsList(&anol);

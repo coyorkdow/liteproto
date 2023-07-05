@@ -110,21 +110,21 @@ class String<ConstOption::CONST> : public List<char, ConstOption::CONST> {
 namespace internal {
 
 template <class Tp>
-class StringAdapter<Tp, std::enable_if_t<IsStringV<Tp>>> : public ListAdapter<Tp> {
-  using base = ListAdapter<Tp>;
+class StringAdapter<Tp, std::enable_if_t<IsStringV<Tp>>> : public ListAdapter<Tp, false /*no proxy*/> {
+  using base = ListAdapter<Tp, false>;
 
  public:
   using const_adapter = StringAdapter<const Tp, void>;
 
-  explicit StringAdapter(typename base::container_type* c) noexcept : ListAdapter<Tp>(c) {}
+  explicit StringAdapter(typename base::container_type* c) noexcept : base(c) {}
 
-  const char* c_str() const noexcept { return base::container_->c_str(); }
+  decltype(auto) c_str() const noexcept { return base::container_->c_str(); }
   decltype(auto) data() const noexcept { return base::container_->data(); }
 
-  void append(const char* cstr, size_t n) const {
+  void append(const void* cstr, size_t n) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<typename base::container_type>) {
-      base::container_->append(cstr, n);
+    if constexpr (!base::is_const) {
+      base::container_->append(static_cast<const typename base::underlying_value_type*>(cstr), n);
     }
   }
 

@@ -13,7 +13,7 @@
 namespace liteproto {
 
 namespace internal {
-template <class Tp, class = void>
+template <class Tp, bool Proxy = true, class = void>
 class ListAdapter;
 }
 
@@ -146,8 +146,8 @@ class List<const volatile Object, ConstOpt> {
 
 namespace internal {
 
-template <class Tp>
-class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
+template <class Tp, bool Proxy>
+class ListAdapter<Tp, Proxy, std::enable_if_t<IsListV<Tp>>> {
   static_assert(!std::is_reference_v<Tp>);
   using list_traits = ListTraits<Tp>;
 
@@ -157,8 +157,12 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   static inline constexpr bool is_const = std::is_const_v<container_type>;
 
  private:
-  using traits = InterfaceTraits<typename ProxyType<underlying_value_type>::type, static_cast<ConstOption>(is_const)>;
-  using const_traits = InterfaceTraits<typename ProxyType<underlying_value_type>::type, ConstOption::CONST>;
+  using traits = std::conditional_t<Proxy,  // If it doesn't proxy, keep the original type
+                                    InterfaceTraits<typename ProxyType<underlying_value_type>::type, static_cast<ConstOption>(is_const)>,
+                                    InterfaceTraits<underlying_value_type, static_cast<ConstOption>(is_const)>>;
+  using const_traits = std::conditional_t<Proxy,  // same as above
+                                          InterfaceTraits<typename ProxyType<underlying_value_type>::type, ConstOption::CONST>,
+                                          InterfaceTraits<underlying_value_type, ConstOption::CONST>>;
 
  public:
   using value_type = typename traits::value_type;
@@ -173,7 +177,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   // It still directly accesses the indirect object inside the class. Only if when visiting through the methods,
   // the adapter creates an Object instance as the proxy of underlying indirect object.
   using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference>;
-  using const_adapter = ListAdapter<const Tp, void>;
+  using const_adapter = ListAdapter<const Tp, Proxy, void>;
 
   explicit ListAdapter(container_type* c) noexcept : container_(c) {
     static_assert(std::is_copy_constructible_v<ListAdapter>);
@@ -184,7 +188,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   template <class Value>
   void push_back(Value&& v) const {
-    if constexpr (std::is_const_v<container_type>) {
+    if constexpr (is_const) {
       // If the container is const, do nothing. And it's assured that this method will never be called.
     } else {
       if constexpr (IsObjectV<value_type>) {
@@ -211,7 +215,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   void pop_back() const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<container_type>) {
+    if constexpr (!is_const) {
       container_->pop_back();
     }
   }
@@ -230,13 +234,13 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   void resize(size_t count) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<container_type>) {
+    if constexpr (!is_const) {
       container_->resize(count);
     }
   }
 
   void resize(size_t count, const value_type& v) const {
-    if constexpr (std::is_const_v<container_type>) {
+    if constexpr (is_const) {
       // If the container is const, do nothing. And it's assured that this method will never be called.
     } else {
       if constexpr (IsObjectV<value_type>) {
@@ -262,7 +266,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
   bool empty() const noexcept { return container_->empty(); }
   void clear() const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<container_type>) {
+    if constexpr (!is_const) {
       container_->clear();
     }
   }
@@ -279,7 +283,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   template <class Value>
   iterator insert(iterator pos, Value&& v) const {
-    if constexpr (std::is_const_v<container_type>) {
+    if constexpr (is_const) {
       // If the container is const, do nothing. And it's assured that this method will never be called.
     } else {
       auto& any_iter = internal::GetIteratorAdapter(pos);
@@ -313,7 +317,7 @@ class ListAdapter<Tp, std::enable_if_t<IsListV<Tp>>> {
 
   iterator erase(iterator pos) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
-    if constexpr (!std::is_const_v<container_type>) {
+    if constexpr (!is_const) {
       auto& any_iter = internal::GetIteratorAdapter(pos);
       auto rhs_it = std::any_cast<iterator_adapter>(&any_iter);
       if (rhs_it != nullptr) {

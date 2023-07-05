@@ -17,7 +17,7 @@ using DummyPointer = Dummy*;
 
 namespace details {
 
-template <class Tp, class = std::enable_if_t<(std::is_arithmetic_v<Tp> && !is_char_v<Tp>) || IsNumberV<Tp>>>
+template <class Tp, class = std::enable_if_t<std::is_arithmetic_v<Tp> || IsNumberV<Tp>>>
 auto IsProxiedByNumberImpl(int) -> std::true_type;
 
 template <class Tp>

@@ -44,7 +44,6 @@ enum class Kind : int8_t {
   VOID,
   NUMBER,
   NUMBER_REFERENCE,
-  CHAR,
   OTHER_SCALAR,
   REFERENCE,
   FUNCTION,
@@ -385,12 +384,10 @@ struct TypeMeta {
       return Kind::OBJECT;
     } else if constexpr (std::is_void_v<Tp>) {
       return Kind::VOID;
-    } else if constexpr (IsNumberV<Tp> || (std::is_arithmetic_v<Tp> && !is_char_v<Tp>)) {
+    } else if constexpr (IsNumberV<Tp> || (std::is_arithmetic_v<Tp>)) {
       return Kind::NUMBER;
     } else if constexpr (IsNumberReferenceV<Tp>) {
       return Kind::NUMBER_REFERENCE;
-    } else if constexpr (is_char_v<Tp>) {
-      return Kind::CHAR;
     } else if constexpr (std::is_scalar_v<Tp>) {
       return Kind::OTHER_SCALAR;
     } else if constexpr (std::is_reference_v<Tp>) {

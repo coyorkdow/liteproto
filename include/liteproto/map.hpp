@@ -49,7 +49,7 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
   using iterator = Iterator<value_type, pointer, reference, std::forward_iterator_tag>;
 
   using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference>;
-  using const_adapter = ListAdapter<const Tp, void>;
+  using const_adapter = MapAdapter<const Tp, void>;
 
   explicit MapAdapter(container_type* c) noexcept : container_(c) {
     static_assert(std::is_copy_constructible_v<MapAdapter>);

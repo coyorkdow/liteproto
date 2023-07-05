@@ -61,8 +61,11 @@ struct ListInterface {
   to_const_t* to_const;
 };
 
+// This interface offers the provides the String inclusive operations. Since all char types are arithmetic types. We directly use void* in
+// our interface.
 template <class Tp>
 struct StringInterface {
+  using iterator = Iterator<Tp, Tp*, Tp&>;
   using c_str_t = const Tp*(const std::any&) noexcept;
   using append_t = void(const std::any&, const Tp*, std::size_t);
   using data_t = Tp*(const std::any&) noexcept;
@@ -73,7 +76,6 @@ struct StringInterface {
   c_str_t* c_str;
   append_t* append;
   data_t* data;
-
   const_interface_t* const_interface;
   to_const_t* to_const;
 };

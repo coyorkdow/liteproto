@@ -22,7 +22,7 @@ namespace liteproto {
 template <class Tp>
 [[nodiscard]] Object GetReflection(Tp* v) noexcept {
   constexpr ConstOption opt [[maybe_unused]] = std::is_const_v<Tp> ? ConstOption::CONST : ConstOption::NON_CONST;
-  if constexpr (IsNumberV<Tp> || (std::is_arithmetic_v<Tp> && !is_char_v<Tp>)) {
+  if constexpr (IsNumberV<Tp> || (std::is_arithmetic_v<Tp>)) {
     return Object(v, NumberReference(*v));
   } else if constexpr (IsStringV<Tp>) {
     return Object(v, AsString(v));
