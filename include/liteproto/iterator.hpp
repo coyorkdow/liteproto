@@ -9,8 +9,8 @@
 
 #include "liteproto/reflect/number.hpp"
 #include "liteproto/reflect/object.hpp"
-#include "liteproto/reflect/type.hpp"
 #include "liteproto/reflect/proxy.hpp"
+#include "liteproto/reflect/type.hpp"
 
 namespace liteproto {
 
@@ -302,6 +302,7 @@ class IteratorAdapter {
     static_assert(std::is_copy_assignable<IteratorAdapter>::value);
     static_assert(std::is_swappable<IteratorAdapter>::value);
   }
+  explicit IteratorAdapter(wrapped_iterator&& it) noexcept(noexcept(wrapped_iterator{std::move(it)})) : it_(std::move(it)) {}
 
   reference operator*() const noexcept(noexcept(*it_)) {
     if constexpr (IsProxyTypeV<reference>) {

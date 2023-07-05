@@ -237,6 +237,9 @@ TEST(TestList, ListOfString) {
   std::string _{"abc"};
   list.resize(10, GetReflection(&_));
   EXPECT_EQ(anol.size(), 10);
+  int pseudo = 0;
+  list.resize(20, GetReflection(&pseudo)); // doesn't work
+  EXPECT_EQ(list.size(), 10);
   auto iter = std::next(anol.begin(), 5);
   for (int i = 5; i < 10; i++) {
     EXPECT_EQ(*iter, "abc");

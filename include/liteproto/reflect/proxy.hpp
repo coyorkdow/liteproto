@@ -64,11 +64,15 @@ struct IsProxyType<Object> : std::true_type {};
 template <>
 struct IsProxyType<Number> : std::true_type {};
 
-template <ConstOption Opt>
-struct IsProxyType<NumberReference<Opt>> : std::true_type {};
-
 template <class FT, class ST>
 struct IsProxyType<std::pair<FT, ST>> : std::bool_constant<IsProxyType<FT>::value || IsProxyType<ST>::value> {};
+
+template <class Tp>
+struct IsProxyType<const Tp> : IsProxyType<Tp> {};
+template <class Tp>
+struct IsProxyType<volatile Tp> : IsProxyType<Tp> {};
+template <class Tp>
+struct IsProxyType<const volatile Tp> : IsProxyType<Tp> {};
 
 template <class Tp>
 inline constexpr bool IsProxyTypeV = IsProxyType<Tp>::value;
@@ -128,7 +132,7 @@ struct InterfaceTraits<Tp, Opt, std::enable_if_t<IsPairV<Tp>>> {
 };
 
 template <class Proxy, class Tp, class = std::enable_if_t<IsProxyTypeV<Proxy>>>
-Proxy MakeProxy(Tp&& value) {
+Proxy MakeProxy(Tp&& value) noexcept {
   if constexpr (IsObjectV<Proxy>) {
     return GetReflection(&value);
   } else if constexpr (IsNumberReferenceV<Proxy>) {
@@ -145,6 +149,60 @@ Proxy MakeProxy(Tp&& value) {
       return Proxy{value.first, MakeProxy<second_type>(value.second)};
     }
   }
+}
+
+template <class Underlying, class Tp, class = std::enable_if_t<IsProxyTypeV<std::remove_reference_t<Tp>>>>
+std::optional<Underlying> RestoreFromProxy(Tp&& value) noexcept;
+
+namespace details {
+template <class Underlying, class Tp>
+auto RestoreFromProxyHelper(Tp&& value) noexcept {
+  if constexpr (IsProxyTypeV<std::remove_reference_t<Tp>>) {
+    return RestoreFromProxy<Underlying>(std::forward<Tp>(value));
+  } else {
+    return std::optional<Underlying>(std::forward<Tp>(value));
+  }
+}
+}  // namespace details
+
+template <class Underlying, class Tp, class>
+std::optional<Underlying> RestoreFromProxy(Tp&& value) noexcept {
+  using return_type = std::optional<Underlying>;
+  using rm_refed = std::remove_reference_t<Tp>;
+  if constexpr (IsObjectV<rm_refed>) {
+    auto v_ptr = ObjectCast<Underlying>(value);
+    if (v_ptr != nullptr) {
+      // If this is an indirect interface, all the modification operations are considered as pass by "move".
+      return return_type{std::move(*v_ptr)};
+    }
+  } else if constexpr (IsNumberV<rm_refed>) {
+    if (value.IsSignedInteger()) {
+      return return_type{value.AsInt64()};
+    } else if (value.IsUnsigned()) {
+      return return_type{value.AsUInt64()};
+    } else {
+      return return_type{value.AsFloat64()};
+    }
+  } else {
+    static_assert(IsPairV<rm_refed> && IsProxyTypeV<Underlying>);
+    using first_type = typename PairTraits<Underlying>::first_type;
+    using second_type = typename PairTraits<Underlying>::second_type;
+    if constexpr (std::is_rvalue_reference_v<decltype(value)>) {
+      auto first = details::RestoreFromProxyHelper<first_type>(std::move(value.first));
+      auto second = details::RestoreFromProxyHelper<second_type>(std::move(value.second));
+      if (first.has_value() && second.has_value()) {
+        return return_type{std::in_place, std::move(first.value()), std::move(second.value())};
+      }
+    } else {
+      auto first = details::RestoreFromProxyHelper<first_type>(value.first);
+      auto second = details::RestoreFromProxyHelper<second_type>(value.second);
+      if (first.has_value() && second.has_value()) {
+        return return_type{std::in_place, std::move(first.value()), std::move(second.value())};
+      }
+    }
+  }
+
+  return return_type{};
 }
 
 }  // namespace liteproto

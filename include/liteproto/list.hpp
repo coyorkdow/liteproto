@@ -191,21 +191,10 @@ class ListAdapter<Tp, Proxy, std::enable_if_t<IsListV<Tp>>> {
     if constexpr (is_const) {
       // If the container is const, do nothing. And it's assured that this method will never be called.
     } else {
-      if constexpr (IsObjectV<value_type>) {
-        static_assert(IsObjectV<std::remove_reference_t<Value>>);
-        auto v_ptr = ObjectCast<underlying_value_type>(v);
-        if (v_ptr != nullptr) {
-          // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
-          container_->push_back(std::move(*v_ptr));
-        }
-      } else if constexpr (IsNumberV<value_type>) {
-        static_assert(IsNumberV<std::remove_reference_t<Value>>);
-        if (v.IsSignedInteger()) {
-          container_->push_back(v.AsInt64());
-        } else if (v.IsUnsigned()) {
-          container_->push_back(v.AsUInt64());
-        } else {
-          container_->push_back(v.AsFloat64());
+      if constexpr (IsProxyTypeV<value_type>) {
+        auto real_v = RestoreFromProxy<underlying_value_type>(std::forward<Value>(v));
+        if (real_v.has_value()) {
+          container_->push_back(std::move(*real_v));
         }
       } else {
         container_->push_back(std::forward<Value>(v));
@@ -243,18 +232,10 @@ class ListAdapter<Tp, Proxy, std::enable_if_t<IsListV<Tp>>> {
     if constexpr (is_const) {
       // If the container is const, do nothing. And it's assured that this method will never be called.
     } else {
-      if constexpr (IsObjectV<value_type>) {
-        auto v_ptr = ObjectCast<underlying_value_type>(v);
-        if (v_ptr != nullptr) {
-          container_->resize(count, *v_ptr);
-        }
-      } else if constexpr (IsNumberV<value_type>) {
-        if (v.IsSignedInteger()) {
-          container_->resize(count, v.AsInt64());
-        } else if (v.IsUnsigned()) {
-          container_->resize(count, v.AsUInt64());
-        } else {
-          container_->resize(count, v.AsFloat64());
+      if constexpr (IsProxyTypeV<value_type>) {
+        auto real_v = RestoreFromProxy<underlying_value_type>(v);
+        if (real_v.has_value()) {
+          container_->resize(count, *real_v);
         }
       } else {
         container_->resize(count, v);
@@ -291,21 +272,10 @@ class ListAdapter<Tp, Proxy, std::enable_if_t<IsListV<Tp>>> {
       if (rhs_it == nullptr) {
         return end();
       }
-      if constexpr (IsObjectV<value_type>) {
-        static_assert(IsObjectV<std::remove_reference_t<Value>>);
-        auto v_ptr = ObjectCast<underlying_value_type>(v);
-        if (v_ptr != nullptr) {
-          // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
-          rhs_it->InsertMyself(container_, std::move(*v_ptr));
-        }
-      } else if constexpr (IsNumberV<value_type>) {
-        static_assert(IsNumberV<std::remove_reference_t<Value>>);
-        if (v.IsSignedInteger()) {
-          rhs_it->InsertMyself(container_, v.AsInt64());
-        } else if (v.IsUnsigned()) {
-          rhs_it->InsertMyself(container_, v.AsUInt64());
-        } else {
-          rhs_it->InsertMyself(container_, v.AsFloat64());
+      if constexpr (IsProxyTypeV<value_type>) {
+        auto real_v = RestoreFromProxy<underlying_value_type>(std::forward<Value>(v));
+        if (real_v.has_value()) {
+          rhs_it->InsertMyself(container_, std::move(*real_v));
         }
       } else {
         rhs_it->InsertMyself(container_, std::forward<Value>(v));

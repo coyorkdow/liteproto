@@ -83,18 +83,13 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
     if constexpr (std::is_const_v<container_type>) {
       return 0;
     } else {
-      if constexpr (IsObjectV<value_type>) {
-        static_assert(IsObjectV<std::remove_reference_t<Value>>);
-        auto v_ptr = ObjectCast<underlying_value_type>(v);
-        if (v_ptr != nullptr) {
-          // If this is an indirect interface, all the push_back & insert operations are considered as pass by "move".
-//          rhs_it->InsertMyself(container_, std::move(*v_ptr));
+      if constexpr (IsProxyTypeV<value_type>) {
+        auto real_v = RestoreFromProxy<underlying_value_type>(std::forward<Value>(v));
+        if (real_v.has_value()) {
+          container_->insert(std::move(*real_v));
         }
-      } else if constexpr (IsNumberV<value_type>) {
-
       } else {
-        auto res = container_->insert(std::forward<Value>(v));
-
+        container_->insert(std::forward<Value>(v));
       }
     }
   }
@@ -118,8 +113,7 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
     } else {
       iter = container_->find(key);
     }
-    iterator_adapter it_adapter{iter};
-    return internal::MakeIterator<std::forward_iterator_tag>(std::move(it_adapter), GetIteratorInterface<decltype(it_adapter)>());
+    return MakeIterator(std::move(iter));
   }
 
   iterator erase(iterator pos) const {
@@ -165,7 +159,8 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
  private:
   template <class It>
   [[nodiscard]] iterator MakeIterator(It&& iterator) const noexcept {
-
+    iterator_adapter it_adapter{std::forward<It>(iterator)};
+    return internal::MakeIterator<std::forward_iterator_tag>(std::move(it_adapter), GetIteratorInterface<decltype(it_adapter)>());
   }
 
   container_type* container_;
