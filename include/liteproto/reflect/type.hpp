@@ -43,6 +43,7 @@ namespace liteproto {
 enum class Kind : int8_t {
   VOID,
   NUMBER,
+  NUMBER_REFERENCE,
   CHAR,
   OTHER_SCALAR,
   REFERENCE,
@@ -65,12 +66,12 @@ enum class Kind : int8_t {
 // double is FLOAT64 type. Some Type enums also indicate the template container in STL, like std::vector and std::map.
 // It's because we regulate the Traits() method of TypeDescriptor offers all the unary predicates from <type_traits>,
 // and there is no such trait of std::is_vector. So we offer such inspection in different ways.
-// Since the goal of Type enum is to indicate the exact type. It has a stricter rule than Kind enum. For example, a
-// const std::shared_ptr is also a kind of smart pointer, but its Type is not SHARED_PTR. SHARED_PTR only comes after a
-// remove_const transform.
+// According to the c++ type system, we suppose that a type with cv-qualifier is still this type. e.g., const int still has the enum of
+// Type::INT32.
 
 enum class Type : int32_t {
   VOID,
+  NULLPTR,
   UINT8,
   INT8,
   UINT32,
@@ -81,9 +82,6 @@ enum class Type : int32_t {
   FLOAT64,
   BOOLEAN,
   CHAR,
-
-  OBJECT,
-  MESSAGE,
 
   SHARED_PTR,
   UNIQUE_PTR,
@@ -97,6 +95,16 @@ enum class Type : int32_t {
   STD_ARRAY,
   STD_PAIR,
   STD_ANY,
+
+  NUMBER,
+  NUMBER_REFERENCE_NON_CONST,
+  NUMBER_REFERENCE_CONST,
+
+  // TODO adc all interface types
+  LIST_NON_CONST,
+  LIST_CONST,
+  STRING_NON_CONST,
+  STRING_CONST,
 
   OTHER
 };
@@ -377,18 +385,19 @@ struct TypeMeta {
       return Kind::OBJECT;
     } else if constexpr (std::is_void_v<Tp>) {
       return Kind::VOID;
-    } else if constexpr (std::is_arithmetic_v<Tp> && !is_char_v<Tp>) {
+    } else if constexpr (IsNumberV<Tp> || (std::is_arithmetic_v<Tp> && !is_char_v<Tp>)) {
       return Kind::NUMBER;
+    } else if constexpr (IsNumberReferenceV<Tp>) {
+      return Kind::NUMBER_REFERENCE;
     } else if constexpr (is_char_v<Tp>) {
       return Kind::CHAR;
     } else if constexpr (std::is_scalar_v<Tp>) {
-      static_assert(std::is_scalar_v<std::nullptr_t>);
       return Kind::OTHER_SCALAR;
     } else if constexpr (std::is_reference_v<Tp>) {
       return Kind::REFERENCE;
     } else if constexpr (std::is_function_v<Tp>) {
       return Kind::FUNCTION;
-    } else if constexpr (IsSmartPtrV<std::remove_cv_t<Tp>>) {  // manually remove the cv-qualifiers
+    } else if constexpr (IsSmartPtrV<Tp>) {
       return Kind::SMART_PTR;
     } else if constexpr (IsStringV<Tp>) {
       return Kind::STRING;
@@ -407,30 +416,31 @@ struct TypeMeta {
   }
 
   static constexpr Type TypeEnum() noexcept {
-    if constexpr (std::is_same_v<Tp, Object>) {
-      return Type::OBJECT;
-    } else if constexpr (std::is_same_v<Tp, char>) {
+    using removed_cv = std::remove_cv_t<Tp>;
+    if constexpr (std::is_same_v<removed_cv, char>) {
       return Type::CHAR;
-    } else if constexpr (std::is_same_v<Tp, bool>) {
+    } else if constexpr (std::is_same_v<removed_cv, bool>) {
       return Type::BOOLEAN;
-    } else if constexpr (std::is_same_v<Tp, uint8_t>) {
+    } else if constexpr (std::is_same_v<removed_cv, uint8_t>) {
       return Type::UINT8;
-    } else if constexpr (std::is_same_v<Tp, int8_t>) {
+    } else if constexpr (std::is_same_v<removed_cv, int8_t>) {
       return Type::INT8;
-    } else if constexpr (std::is_same_v<Tp, uint32_t>) {
+    } else if constexpr (std::is_same_v<removed_cv, uint32_t>) {
       return Type::UINT32;
-    } else if constexpr (std::is_same_v<Tp, int32_t>) {
+    } else if constexpr (std::is_same_v<removed_cv, int32_t>) {
       return Type::INT32;
-    } else if constexpr (std::is_same_v<Tp, uint64_t>) {
+    } else if constexpr (std::is_same_v<removed_cv, uint64_t>) {
       return Type::UINT64;
-    } else if constexpr (std::is_same_v<Tp, int64_t>) {
+    } else if constexpr (std::is_same_v<removed_cv, int64_t>) {
       return Type::INT64;
-    } else if constexpr (std::is_same_v<Tp, float>) {
+    } else if constexpr (std::is_same_v<removed_cv, float>) {
       return Type::FLOAT32;
-    } else if constexpr (std::is_same_v<Tp, double>) {
+    } else if constexpr (std::is_same_v<removed_cv, double>) {
       return Type::FLOAT64;
     } else if constexpr (std::is_void_v<Tp>) {
       return Type::VOID;
+    } else if constexpr (std::is_null_pointer_v<Tp>) {
+      return Type::NULLPTR;
     } else if constexpr (IsSmartPtrV<Tp>) {
       if constexpr (SmartPtrTraits<Tp>::category == UNIQUE_PTR) {
         return Type::UNIQUE_PTR;
@@ -438,7 +448,7 @@ struct TypeMeta {
         static_assert(SmartPtrTraits<Tp>::category == SHARED_PTR);
         return Type::SHARED_PTR;
       }
-    } else if constexpr (std::is_same_v<Tp, std::string>) {
+    } else if constexpr (std::is_same_v<removed_cv, std::string>) {
       return Type::STD_STRING;
     } else if constexpr (IsSTDvectorV<Tp>) {
       return Type::STD_VECTOR;
@@ -452,8 +462,16 @@ struct TypeMeta {
       return Type::STD_UNORDERED_MAP;
     } else if constexpr (IsSTDarrayV<Tp>) {
       return Type::STD_ARRAY;
-    } else if constexpr (std::is_same_v<Tp, std::any>) {
+    } else if constexpr (std::is_same_v<removed_cv, std::any>) {
       return Type::STD_ANY;
+    } else if constexpr (IsSTDpairV<Tp>) {
+      return Type::STD_PAIR;
+    } else if constexpr (IsNumberV<Tp>) {
+      return Type::NUMBER;
+    } else if constexpr (std::is_same_v<removed_cv, NumberReference<ConstOption::NON_CONST>>) {
+      return Type::NUMBER_REFERENCE_NON_CONST;
+    } else if constexpr (std::is_same_v<removed_cv, NumberReference<ConstOption::CONST>>) {
+      return Type::NUMBER_REFERENCE_CONST;
     }
 
     return Type::OTHER;

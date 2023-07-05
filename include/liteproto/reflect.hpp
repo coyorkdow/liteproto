@@ -4,14 +4,16 @@
 
 #pragma once
 
+#include <cassert>
+
 #include "liteproto/list.hpp"
 #include "liteproto/map.hpp"
 #include "liteproto/message.hpp"
 #include "liteproto/pair.hpp"
 #include "liteproto/reflect/number.hpp"
 #include "liteproto/reflect/object.hpp"
-#include "liteproto/reflect/type.hpp"
 #include "liteproto/reflect/proxy.hpp"
+#include "liteproto/reflect/type.hpp"
 #include "liteproto/string.hpp"
 #include "liteproto/traits/traits.hpp"
 
@@ -20,10 +22,8 @@ namespace liteproto {
 template <class Tp>
 [[nodiscard]] Object GetReflection(Tp* v) noexcept {
   constexpr ConstOption opt [[maybe_unused]] = std::is_const_v<Tp> ? ConstOption::CONST : ConstOption::NON_CONST;
-  if constexpr (std::is_arithmetic_v<Tp> && !is_char_v<Tp>) {
+  if constexpr (IsNumberV<Tp> || (std::is_arithmetic_v<Tp> && !is_char_v<Tp>)) {
     return Object(v, NumberReference(*v));
-  } else if constexpr (std::is_scalar_v<Tp>) {
-    return Object(v);
   } else if constexpr (IsStringV<Tp>) {
     return Object(v, AsString(v));
   } else if constexpr (IsListV<Tp>) {
@@ -32,7 +32,10 @@ template <class Tp>
     // TODO
   } else if constexpr (IsPairV<Tp>) {
     // TODO
+  } else {
+    return Object(v);
   }
+  std::abort(); // never enter
 }
 
 template <class Tp>

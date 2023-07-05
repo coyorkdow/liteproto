@@ -94,7 +94,7 @@ class Object {
   Object(Tp* value_ptr, Interface interface) noexcept
       : descriptor_(&TypeMeta<Tp>::GetDescriptor()), ptr_to_value_(value_ptr), interface_(std::move(interface)), addr_(value_ptr) {}
 
-  template <class Tp, class = std::enable_if_t<std::is_scalar_v<Tp>>>
+  template <class Tp /*, class = std::enable_if_t<std::is_scalar_v<Tp>>*/>
   explicit Object(Tp* value_ptr) noexcept : descriptor_(&TypeMeta<Tp>::GetDescriptor()), ptr_to_value_(value_ptr), addr_(value_ptr) {}
 
   const TypeDescriptor* descriptor_;

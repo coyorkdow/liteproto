@@ -60,36 +60,6 @@ inline constexpr bool is_map_v = has_insert_v<C, std::pair<K, V>> && has_find_v<
 //   using value_type = void;
 // };
 
-enum SmartPtrCategory : uint8_t { SHARED_PTR, UNIQUE_PTR };
-
-template <class Tp>
-struct SmartPtrTraits {};
-
-template <class Tp>
-struct SmartPtrTraits<std::shared_ptr<Tp>> {
-  using value_type = Tp;
-  static constexpr SmartPtrCategory category = SHARED_PTR;
-};
-
-template <class Tp, class Dp>
-struct SmartPtrTraits<std::unique_ptr<Tp, Dp>> {
-  using value_type = Tp;
-  static constexpr SmartPtrCategory category = UNIQUE_PTR;
-};
-
-template <class Tp, class Cond = void>
-struct IsSmartPtr : std::false_type {};
-
-template <class Tp>
-struct IsSmartPtr<Tp, std::void_t<typename SmartPtrTraits<Tp>::value_type>> : std::true_type {};
-
-template <class Tp>
-inline constexpr bool IsSmartPtrV = IsSmartPtr<Tp>::value;
-
-static_assert(IsSmartPtrV<std::unique_ptr<int>> && IsSmartPtrV<std::shared_ptr<void*>>);
-static_assert(SmartPtrTraits<std::unique_ptr<int>>::category == UNIQUE_PTR);
-static_assert(!IsSmartPtrV<const std::unique_ptr<int>>);
-
 #define LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(name)                                                    \
   template <class Tp, class Cond = void>                                                               \
   struct STD##name##Traits {};                                                                         \
@@ -97,6 +67,9 @@ static_assert(!IsSmartPtrV<const std::unique_ptr<int>>);
   struct STD##name##Traits<std::name<Args...>> {                                                       \
     using value_type = typename std::name<Args...>::value_type;                                        \
   };                                                                                                   \
+  template <class Tp>                                                                                  \
+  struct STD##name##Traits<Tp, std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>>        \
+      : STD##name##Traits<std::remove_cv_t<Tp>> {};                                                    \
   template <class Tp, class Cond = void>                                                               \
   struct IsSTD##name : std::false_type {};                                                             \
   template <class Tp>                                                                                  \
@@ -110,21 +83,19 @@ LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(list)
 LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(map)
 LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_(unordered_map)
 
-static_assert(IsSTDvectorV<std::vector<int>>);
-static_assert(IsSTDdequeV<std::deque<int>>);
-static_assert(IsSTDlistV<std::list<int>>);
-static_assert(IsSTDmapV<std::map<int, int>>);
-static_assert(IsSTDunordered_mapV<std::unordered_map<int, double>>);
-static_assert(std::is_same_v<typename STDmapTraits<std::map<int, double>>::value_type, std::pair<const int, double>>);
-
 #undef LITE_PROTO_MAKE_STL_CONTAINER_TRAITS_
 
 template <class Tp, class Cond = void>
 struct STDarrayTraits {};
+
 template <class Arg, size_t N>
 struct STDarrayTraits<std::array<Arg, N>> {
   using value_type = typename std::array<Arg, N>::value_type;
 };
+
+template <class Tp>
+struct STDarrayTraits<Tp, std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>> : STDarrayTraits<std::remove_cv_t<Tp>> {};
+
 template <class Tp, class Cond = void>
 struct IsSTDarray : std::false_type {};
 template <class Tp>
@@ -132,8 +103,24 @@ struct IsSTDarray<Tp, std::void_t<typename STDarrayTraits<Tp>::value_type>> : st
 template <class Tp>
 inline constexpr bool IsSTDarrayV = IsSTDarray<Tp>::value;
 
-static_assert(IsSTDarrayV<std::array<int, 123>>);
-static_assert(std::is_same_v<typename STDarrayTraits<std::array<int, 123>>::value_type, int>);
+template <class Tp, class Cond = void>
+struct STDpairTraits {};
+
+template <class FT, class ST>
+struct STDpairTraits<std::pair<FT, ST>> {
+  using first_type = FT;
+  using second_type = ST;
+};
+
+template <class Tp>
+struct STDpairTraits<Tp, std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>> : STDpairTraits<std::remove_cv_t<Tp>> {};
+
+template <class Tp, class Cond = void>
+struct IsSTDpair : std::false_type {};
+template <class Tp>
+struct IsSTDpair<Tp, std::void_t<typename STDpairTraits<Tp>::first_type>> : std::true_type {};
+template <class Tp>
+inline constexpr bool IsSTDpairV = IsSTDpair<Tp>::value;
 
 template <class Tp>
 struct IsObject : std::false_type {};
@@ -177,6 +164,42 @@ struct IsNumberReference<const volatile NumberReference<Opt>> : std::true_type {
 template <class Tp>
 inline constexpr bool IsNumberReferenceV = IsNumberReference<Tp>::value;
 
+enum SmartPtrCategory : uint8_t { SHARED_PTR, UNIQUE_PTR };
+
+template <class Tp, class Cond = void>
+struct SmartPtrTraits {};
+
+template <class Tp>
+struct SmartPtrTraits<std::shared_ptr<Tp>> {
+  using value_type = Tp;
+  static constexpr SmartPtrCategory category = SHARED_PTR;
+  using container_type = std::shared_ptr<Tp>;
+};
+
+template <class Tp, class Dp>
+struct SmartPtrTraits<std::unique_ptr<Tp, Dp>> {
+  using value_type = Tp;
+  static constexpr SmartPtrCategory category = UNIQUE_PTR;
+  using container_type = std::unique_ptr<Tp, Dp>;
+};
+
+template <class Tp>
+struct SmartPtrTraits<Tp, std::void_t<std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>,
+                                      typename SmartPtrTraits<std::remove_cv_t<Tp>>::value_type>> {
+  using value_type = typename SmartPtrTraits<std::remove_cv_t<Tp>>::value_type;
+  static constexpr SmartPtrCategory category = SmartPtrTraits<std::remove_cv_t<Tp>>::category;
+  using container_type = Tp;
+};
+
+template <class Tp, class Cond = void>
+struct IsSmartPtr : std::false_type {};
+
+template <class Tp>
+struct IsSmartPtr<Tp, std::void_t<typename SmartPtrTraits<Tp>::value_type>> : std::true_type {};
+
+template <class Tp>
+inline constexpr bool IsSmartPtrV = IsSmartPtr<Tp>::value;
+
 template <class Tp, class Cond = void>
 struct ListTraits {};
 
@@ -186,22 +209,17 @@ struct ListTraits<C<V, Tps...>, std::enable_if_t<internal::is_list_v<C<V, Tps...
   using value_type = V;
 };
 
-template <template <class...> class C, class V, class... Tps>
-struct ListTraits<const C<V, Tps...>, std::enable_if_t<internal::is_list_v<C<V, Tps...>, V>>> {
-  using container_type = const C<V, Tps...>;
-  using value_type = V;
-};
-
 template <template <class, auto...> class C, class V, auto... Args>
 struct ListTraits<C<V, Args...>, std::enable_if_t<internal::is_list_v<C<V, Args...>, V>>> {
   using container_type = C<V, Args...>;
   using value_type = V;
 };
 
-template <template <class, auto...> class C, class V, auto... Args>
-struct ListTraits<const C<V, Args...>, std::enable_if_t<internal::is_list_v<C<V, Args...>, V>>> {
-  using container_type = const C<V, Args...>;
-  using value_type = V;
+template <class Tp>
+struct ListTraits<Tp, std::void_t<std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>,
+                                  typename ListTraits<std::remove_cv_t<Tp>>::value_type>> {
+  using container_type = Tp;
+  using value_type = typename ListTraits<std::remove_cv_t<Tp>>::value_type;
 };
 
 template <class Tp, class Cond = void>
@@ -220,6 +238,12 @@ template <class Str>
 struct IsString<const Str> : std::bool_constant<internal::is_string_v<Str, char>> {};
 
 template <class Str>
+struct IsString<volatile Str> : std::bool_constant<internal::is_string_v<Str, char>> {};
+
+template <class Str>
+struct IsString<const volatile Str> : std::bool_constant<internal::is_string_v<Str, char>> {};
+
+template <class Str>
 inline constexpr bool IsStringV = IsString<Str>::value;
 
 template <class C, class Cond = void>
@@ -233,12 +257,13 @@ struct MapTraits<C<K, V, Tps...>, std::enable_if_t<internal::is_map_v<C<K, V, Tp
   using container_type = C<K, V, Tps...>;
 };
 
-template <template <class...> class C, class K, class V, class... Tps>
-struct MapTraits<const C<K, V, Tps...>, std::enable_if_t<internal::is_map_v<C<K, V, Tps...>, K, V>>> {
-  using key_type = K;
-  using mapped_type = V;
-  using value_type = std::pair<const K, V>;
-  using container_type = const C<K, V, Tps...>;
+template <class Tp>
+struct MapTraits<Tp, std::void_t<std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>,
+                                 typename MapTraits<std::remove_cv_t<Tp>>::value_type>> {
+  using key_type = typename MapTraits<std::remove_cv_t<Tp>>::key_type;
+  using mapped_type = typename MapTraits<std::remove_cv_t<Tp>>::mapped_type;
+  using value_type = typename MapTraits<std::remove_cv_t<Tp>>::value_type;
+  using container_type = Tp;
 };
 
 template <class Tp, class Cond = void>
@@ -267,18 +292,12 @@ struct ArrayTraits<Tp[N]> : std::true_type {
   static constexpr size_t size = N;
 };
 
-template <template <class, size_t> class C, class V, size_t N>
-struct ArrayTraits<const C<V, N>, std::enable_if_t<internal::is_array_v<C<V, N>, V>>> : std::true_type {
-  using container_type = const C<V, N>;
-  using value_type = V;
-  static constexpr size_t size = N;
-};
-
-template <class Tp, size_t N>
-struct ArrayTraits<const Tp[N]> : std::true_type {
-  using container_type = const Tp[N];
-  using value_type = Tp;
-  static constexpr size_t size = N;
+template <class Tp>
+struct ArrayTraits<Tp, std::void_t<std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>,
+                                   typename ArrayTraits<std::remove_cv_t<Tp>>::value_type>> {
+  using container_type = Tp;
+  using value_type = typename ArrayTraits<std::remove_cv_t<Tp>>::value_type;
+  static constexpr size_t size = ArrayTraits<std::remove_cv_t<Tp>>::size;
 };
 
 template <class Tp, class Cond = void>
@@ -300,9 +319,6 @@ struct PairTraits<Pair, std::void_t<decltype(std::declval<Pair>().first), declty
   using value_type = Pair;
 };
 
-template <class Pair>
-struct PairTraits<const Pair> : PairTraits<Pair> {};
-
 template <class Pair, class Cond = void>
 struct IsPair : std::false_type {};
 
@@ -323,8 +339,8 @@ struct IsIndirectType<Object> : std::true_type {};
 template <>  // Number is non-indirect. So that a Number object will still be proxies as another Number object.
 struct IsIndirectType<Number> : std::false_type {};
 
-template <ConstOption Opt>
-struct IsIndirectType<NumberReference<Opt>> : std::false_type {};
+template <ConstOption Opt>  // NumberReference is indirect. Which is proxied by Object.
+struct IsIndirectType<NumberReference<Opt>> : std::true_type {};
 
 template <class Tp>
 struct IsIndirectType<Tp, std::enable_if_t<!std::is_const_v<Tp> && !std::is_volatile_v<Tp> && std::is_fundamental_v<Tp>>>

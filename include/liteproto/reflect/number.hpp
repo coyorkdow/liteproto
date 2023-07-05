@@ -23,6 +23,9 @@ class Number {
     }
   }
 
+  template <ConstOption Opt>
+  inline Number(const NumberReference<Opt>& ref) noexcept;
+
   bool IsSignedInteger() const noexcept { return descriptor_->Traits(traits::is_signed); }
   bool IsUnsigned() const noexcept { return descriptor_->Traits(traits::is_unsigned); }
   bool IsFloating() const noexcept { return descriptor_->Traits(traits::is_floating_point); }
@@ -132,14 +135,17 @@ struct NumberInterfaceImpl {
 
 }  // namespace internal
 
+// NumberReference only accepts lvalue reference.
+
 template <>
 class NumberReference<ConstOption::NON_CONST> {
   friend class NumberReference<ConstOption::CONST>;
 
  public:
-  template <class Tp,
-            std::enable_if_t<std::is_arithmetic_v<std::remove_reference_t<Tp>> || IsNumberV<std::remove_reference_t<Tp>>, int> = 0>
-  NumberReference(Tp&& v) : ptr_(&v), interface_(&internal::NumberInterfaceImpl<std::remove_reference_t<Tp>>::MakeNumberInterface()) {
+  NumberReference() noexcept : ptr_(nullptr), interface_(nullptr) {}
+
+  template <class Tp, std::enable_if_t<std::is_arithmetic_v<Tp> || IsNumberV<Tp>, int> = 0>
+  NumberReference(Tp& v) noexcept : ptr_(&v), interface_(&internal::NumberInterfaceImpl<Tp>::MakeNumberInterface()) {
     static_assert(std::is_trivially_copyable_v<NumberReference>);
   }
 
@@ -149,6 +155,8 @@ class NumberReference<ConstOption::NON_CONST> {
   int64_t AsInt64() const noexcept { return interface_->as_int64(ptr_); }
   uint64_t AsUInt64() const noexcept { return interface_->as_uint64(ptr_); }
   double AsFloat64() const noexcept { return interface_->as_float64(ptr_); }
+
+  bool empty() const noexcept { return ptr_ == nullptr; }
 
   template <class Arithmetic, class = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
   explicit operator Arithmetic() const noexcept {
@@ -174,6 +182,8 @@ class NumberReference<ConstOption::NON_CONST> {
 template <>
 class NumberReference<ConstOption::CONST> {
  public:
+  NumberReference() noexcept : ptr_(nullptr), interface_(nullptr) {}
+
   template <class Tp, std::enable_if_t<std::is_arithmetic_v<Tp> || IsNumberV<Tp>, int> = 0>
   NumberReference(const Tp& v) noexcept : ptr_(&v), interface_(&internal::NumberInterfaceImpl<const Tp>::MakeNumberInterface()) {
     static_assert(std::is_trivially_copyable_v<NumberReference>);
@@ -186,6 +196,8 @@ class NumberReference<ConstOption::CONST> {
   int64_t AsInt64() const noexcept { return interface_->as_int64(ptr_); }
   uint64_t AsUInt64() const noexcept { return interface_->as_uint64(ptr_); }
   double AsFloat64() const noexcept { return interface_->as_float64(ptr_); }
+
+  bool empty() const noexcept { return ptr_ == nullptr; }
 
   template <class Arithmetic, class = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
   explicit operator Arithmetic() const noexcept {
@@ -207,6 +219,17 @@ class NumberReference<ConstOption::CONST> {
   const void* ptr_;
   const internal::NumberInterface* interface_;
 };
+
+template <ConstOption Opt>
+inline Number::Number(const NumberReference<Opt>& ref) noexcept : uint64_(0), descriptor_(ref.Descriptor()) {
+  if (ref.IsSignedInteger()) {
+    int64_ = ref.AsInt64();
+  } else if (ref.IsUnsigned()) {
+    uint64_ = ref.AsUInt64();
+  } else {
+    float64_ = ref.AsFloat64();
+  }
+}
 
 template <class Tp, std::enable_if_t<std::is_const_v<std::remove_reference_t<Tp>>, int> = 0>
 NumberReference(Tp&& v) -> NumberReference<ConstOption::CONST>;

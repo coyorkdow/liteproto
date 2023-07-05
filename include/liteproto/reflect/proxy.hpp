@@ -17,7 +17,7 @@ using DummyPointer = Dummy*;
 
 namespace details {
 
-template <class Tp, class = std::enable_if_t<(std::is_arithmetic_v<Tp> && !is_char_v<Tp>) || IsNumberReferenceV<Tp> || IsNumberV<Tp>>>
+template <class Tp, class = std::enable_if_t<(std::is_arithmetic_v<Tp> && !is_char_v<Tp>) || IsNumberV<Tp>>>
 auto IsProxiedByNumberImpl(int) -> std::true_type;
 
 template <class Tp>
@@ -132,7 +132,7 @@ Proxy MakeProxy(Tp&& value) {
   if constexpr (IsObjectV<Proxy>) {
     return GetReflection(&value);
   } else if constexpr (IsNumberReferenceV<Proxy>) {
-    return value;  // implicit conversion applied
+    return Proxy{value};
   } else {
     static_assert(IsPairV<Proxy>);
     using first_type = typename PairTraits<Proxy>::first_type;

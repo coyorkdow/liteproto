@@ -9,14 +9,35 @@
 
 namespace liteproto::internal_test {
 
+static_assert(IsSmartPtrV<std::unique_ptr<int>> && IsSmartPtrV<std::shared_ptr<void*>>);
+static_assert(SmartPtrTraits<std::unique_ptr<int>>::category == UNIQUE_PTR);
+static_assert(IsSmartPtrV<const std::unique_ptr<int>>);
+
+static_assert(IsSTDvectorV<std::vector<int>>);
+static_assert(IsSTDvectorV<const std::vector<int>>);
+static_assert(IsSTDvectorV<volatile std::vector<int>>);
+static_assert(IsSTDvectorV<const volatile std::vector<int>>);
+static_assert(IsSTDdequeV<std::deque<int>>);
+static_assert(IsSTDlistV<std::list<int>>);
+static_assert(IsSTDmapV<std::map<int, int>>);
+static_assert(IsSTDunordered_mapV<std::unordered_map<int, double>>);
+static_assert(std::is_same_v<typename STDmapTraits<std::map<int, double>>::value_type, std::pair<const int, double>>);
+
+static_assert(IsSTDarrayV<std::array<int, 123>>);
+static_assert(IsSTDarrayV<const std::array<int, 123>>);
+static_assert(IsSTDarrayV<volatile std::array<int, 123>>);
+static_assert(IsSTDarrayV<const volatile std::array<int, 123>>);
+static_assert(std::is_same_v<typename STDarrayTraits<std::array<int, 123>>::value_type, int>);
+
 static_assert(IsPairV<std::pair<int, IsPair<void>>>);
 static_assert(IsPairV<const std::pair<int, float>>);
 static_assert(IsPairV<const std::pair<int, const float>>);
 static_assert(IsPairV<const std::pair<int, float&>>);
 static_assert(!IsPairV<void>);
-using p = std::pair<int, IsPair<void>>;
+using p = const std::pair<int, IsPair<void>>;
 static_assert(std::is_same_v<typename PairTraits<p>::first_type, int>);
 static_assert(std::is_same_v<typename PairTraits<p>::second_type, IsPair<void>>);
+static_assert(std::is_same_v<typename PairTraits<p>::value_type, p>);
 
 static_assert(has_c_str_v<std::string, char>);
 static_assert(has_append_v<std::string, char>);
@@ -41,6 +62,8 @@ static_assert(!IsListV<std::vector<int>&&>);
 static_assert(IsListV<std::vector<int>>);
 static_assert(!IsListV<const std::deque<int>&>);
 static_assert(IsListV<const std::deque<int>>);
+static_assert(IsListV<const volatile std::deque<int>>);
+static_assert(std::is_same_v<typename ListTraits<const volatile std::deque<int>>::container_type, const volatile std::deque<int>>);
 
 static_assert(std::is_same_v<typename ListTraits<std::string>::value_type, char>);
 
@@ -73,6 +96,12 @@ static_assert(has_find_v<std::map<std::string, int>, std::string, int>);
 static_assert(has_insert_v<std::map<std::string, int>, std::pair<std::string, int>>);
 
 static_assert(IsMapV<std::map<std::string, int>>);
+static_assert(IsMapV<const std::map<std::string, int>>);
+static_assert(IsMapV<volatile std::map<std::string, int>>);
+static_assert(IsMapV<const volatile std::map<std::string, int>>);
+static_assert(std::is_same_v<typename MapTraits<const volatile std::map<std::string, int>>::value_type, std::pair<const std::string, int>>);
+static_assert(std::is_same_v<typename MapTraits<const volatile std::map<std::string, int>>::container_type,
+                             const volatile std::map<std::string, int>>);
 static_assert(IsMapV<std::unordered_map<std::string, int>>);
 
 using some_pair = std::pair<Object, double>;

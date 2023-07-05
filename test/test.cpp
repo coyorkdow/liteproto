@@ -56,11 +56,21 @@ TEST(TestNumber, Reference) {
   Number n;
   n = static_cast<Number>(1);
   NumberReference ref = n;
+  static_assert(std::is_same_v<decltype(ref), NumberReference<ConstOption::NON_CONST>>);
   ref.SetFloat64(3.14159);
   EXPECT_DOUBLE_EQ(static_cast<double>(n), 3.14159);
+  int i = -1;
+  ref = i;  // change binding
+  EXPECT_EQ(ref.AsInt64(), -1);
+  EXPECT_TRUE(ref.IsSignedInteger());
+  EXPECT_EQ(ref.Descriptor().TypeEnum(), Type::INT32);
   const Number& cref_of_n = n;
   NumberReference cref = cref_of_n;
   EXPECT_DOUBLE_EQ(static_cast<double>(cref), 3.14159);
+  float f = 0.1;
+  cref = f;  // change binding
+  EXPECT_FLOAT_EQ(cref.AsFloat64(), 0.1);
+  EXPECT_DOUBLE_EQ(cref_of_n.AsFloat64(), 3.14159);
 }
 
 TEST(TestNumber, NumberIsNumber) {
@@ -92,6 +102,41 @@ TEST(TestNumber, NumberIsNumber) {
     EXPECT_EQ(list[i].AsInt64(), i + 3);
     EXPECT_EQ(refs[i].AsInt64(), i + 3);
     EXPECT_EQ(refs[i + 3].AsInt64(), i + 3);
+  }
+
+  list.clear();
+  list.push_back(1);
+  list.push_back(3);
+  auto it = list.begin();
+  list.insert(++it, 2);
+  for (int i = 0; i < 3; i++) {
+    EXPECT_EQ(list[i].AsInt64(), i + 1);
+  }
+  list.resize(6, 10.57);
+  for (int i = 3; i < 6; i++) {
+    EXPECT_DOUBLE_EQ(list[i].AsFloat64(), 10.57);
+  }
+}
+
+TEST(TestNumber, ReferenceIsObject) {
+  using namespace liteproto;
+  std::vector<int> nums(1, 5);
+  auto list = AsList(&nums);
+  std::vector<NumberReference<ConstOption::NON_CONST>> refs;
+  for (auto i : list) {
+    refs.emplace_back(i);
+  }
+  auto ref_list = AsList(&refs);
+  static_assert(std::is_same_v<decltype(ref_list), List<Object, ConstOption::NON_CONST>>);
+  for (auto obj : ref_list) {
+    EXPECT_EQ(obj.Descriptor().KindEnum(), Kind::NUMBER_REFERENCE);
+    EXPECT_EQ(obj.Descriptor().TypeEnum(), Type::NUMBER_REFERENCE_NON_CONST);
+    auto ref = ObjectCast<NumberReference<ConstOption::NON_CONST>>(obj);
+    ASSERT_TRUE(ref != nullptr);
+    ref->SetInt64(65536);
+  }
+  for (auto i : nums) {
+    EXPECT_EQ(i, 65536);
   }
 }
 
@@ -152,7 +197,7 @@ TEST(TestList, ListOfString) {
   for (auto it = const_list.begin(); it != const_list.end(); it++, cnt++) {
     auto descriptor = (*it).Descriptor();
     EXPECT_EQ(descriptor.KindEnum(), Kind::STRING);
-    EXPECT_EQ(descriptor.TypeEnum(), Type::OTHER);
+    EXPECT_EQ(descriptor.TypeEnum(), Type::STD_STRING);
     EXPECT_TRUE(descriptor.Traits(traits::is_const));
     EXPECT_EQ(descriptor.Transform(transform::remove_const).TypeEnum(), Type::STD_STRING);
     auto str = ObjectCast<const std::string>(*it);
