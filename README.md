@@ -6,6 +6,11 @@ The principle of the liteproto is to use Macro as little as possible, and make t
 Therefore, I came up with a syntax which is very similar to the protobuf. And it reaches a very strong flexibility.
 You can define any constructor and member function for a `Message`. Moreover, a `Message` can be template or inherit other class.
 
+---
+**This Project is still work in progress. The first release is not ready yet. I am still working on my reflect system.**
+
+---
+
 ```C++
 template <class T1, class T2, class T3>
 TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
