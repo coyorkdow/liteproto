@@ -22,6 +22,9 @@ static_assert(sizeof(addr_t) == sizeof(void*));
 
 class Object;
 
+template <class First, class Second>
+using Pair = std::pair<First, Second>;
+
 template <class Tp, ConstOption Opt>
 class List;
 
@@ -40,6 +43,9 @@ std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept;
 template <ConstOption Opt = ConstOption::NON_CONST>
 std::optional<String<Opt>> StringCast(const Object& object) noexcept;
 
+template <class First, class Second>
+std::optional<Pair<First, Second>> PairCast(const Object& object) noexcept;
+
 class Object {
   template <class Tp>
   friend Object GetReflection(Tp* v) noexcept;
@@ -52,6 +58,9 @@ class Object {
 
   template <ConstOption Opt>
   friend std::optional<String<Opt>> StringCast(const Object& object) noexcept;
+
+  template <class First, class Second>
+  friend std::optional<Pair<First, Second>> PairCast(const Object& object) noexcept;
 
  public:
   [[nodiscard]] addr_t Addr() const noexcept {

@@ -31,11 +31,11 @@ template <class Tp>
   } else if constexpr (IsArrayV<Tp>) {
     // TODO
   } else if constexpr (IsPairV<Tp>) {
-    // TODO
+    return Object(v, AsPair(v));
   } else {
     return Object(v);
   }
-  std::abort(); // never enter
+  std::abort();  // never enter
 }
 
 template <class Tp>
@@ -64,6 +64,9 @@ inline const TypeDescriptor& TypeMeta<Tp>::GetDescriptor() noexcept {
     inter.transform_ = &Transform;
 
     inter.value_type_ = &ValueType;
+    inter.first_type_ = &FirstType;
+    inter.second_type_ = &SecondType;
+
     inter.is_indirect_type_ = &IsIndirectType;
     inter.default_value_ = &DefaultValue;
     return TypeDescriptor{inter};
@@ -71,7 +74,7 @@ inline const TypeDescriptor& TypeMeta<Tp>::GetDescriptor() noexcept {
   return descriptor;
 }
 
-// template <class Tp, ConstOption Opt>
+inline std::pair<Object, std::any> TypeDescriptor::DefaultValue() const noexcept { return inter_.default_value_(); }
 
 template <class Tp, ConstOption Opt>
 std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept {
@@ -93,6 +96,14 @@ std::optional<String<Opt>> StringCast(const Object& object) noexcept {
   return return_type{*indirect_ptr};
 }
 
-inline std::pair<Object, std::any> TypeDescriptor::DefaultValue() const noexcept { return inter_.default_value_(); }
+template <class First, class Second>
+std::optional<Pair<First, Second>> PairCast(const Object& object) noexcept {
+  using return_type = std::optional<Pair<First, Second>>;
+  auto indirect_ptr = std::any_cast<Pair<First, Second>>(&object.interface_);
+  if (indirect_ptr == nullptr) {
+    return return_type{};
+  }
+  return return_type{*indirect_ptr};
+}
 
 }  // namespace liteproto

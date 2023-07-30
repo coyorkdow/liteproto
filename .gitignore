@@ -37,6 +37,8 @@ cmake-build-debug
 cmake-build-release
 cmake-build-debug-gcc
 cmake-build-release-gcc
+cmake-build-debug-clang
+cmake-build-release-clang
 build
 
 .idea

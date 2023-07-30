@@ -367,4 +367,10 @@ struct IsIndirectType<Tp&&> : IsIndirectType<Tp> {};
 template <class Tp>
 inline constexpr bool IsIndirectTypeV = IsIndirectType<Tp>::value;
 
+template <class Tp>
+struct IsNumberType : std::negation<IsIndirectType<Tp>> {};
+
+template <class Tp>
+inline constexpr bool IsNumberTypeV = IsNumberType<Tp>::value;
+
 }  // namespace liteproto

@@ -92,7 +92,7 @@ be proxied by the same types.
 
 ## Proxy Reference
 
-The interfaces are all fat pointers, and they don't store the object. So an interface can be viewed as a reference to the
+All the interfaces are fat pointers, and they don't store the object. So an interface can be viewed as a reference to the
 object which it currently manipulates. According to this rule, the `Number` is not an interface, because it doesn't ref
 another object but stores the value by itself.
 
@@ -117,3 +117,15 @@ A `Number` doesn't refer any other object, it has its own value. According to ou
 as it's not a fat pointer. So unlike `Object`, `Number` can not be used as reference. So we propose another type,
 `NumberReference`, to represent the reference of number types. Unlike `Number`, `NumberReference` is not number type, it
 belongs to the indirect type. So it will be proxied by `Object`.
+
+## Make Proxy
+
+Thus, we totally have three proxy types: `Object`, `Number`, and `NumberReference`. Among these types, `Object` and `Number`
+are used for value_type, and `Object` and `NumberReference` are used for reference.
+
+The function template `MakeProxy` is used to create a proxy of the underlying object, which is invoked when an interface
+or an iterator returns a reference. Similarly, the function template `RestoreFromProxy` is used to restore the underlying
+object from a proxy.
+
+`RestoreFromProxy` has an exception that it also accepts `Number` while the `MakeProxy` only returns `Object` or
+`NumberReference`. The rule of restoring from the `Number` is same as the rule of restoring from the `NumberReference`.
