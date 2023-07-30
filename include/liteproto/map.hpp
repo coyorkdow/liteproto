@@ -17,6 +17,23 @@ template <class Tp, class = void>
 class MapAdapter;
 }
 
+template <class C, class = internal::MapAdapter<C>>
+auto AsMap(C* container) noexcept;
+
+template <class K, class V>
+class Map<K, V, ConstOption::NON_CONST> {
+  template <class C, class>
+  friend auto AsList(C* container) noexcept;
+
+  friend class Map<K, V, ConstOption::CONST>;
+
+//  using traits = InterfaceTraits<Tp, ConstOption::NON_CONST>;
+//  using const_traits = InterfaceTraits<Tp, ConstOption::CONST>;
+
+ public:
+
+};
+
 namespace internal {
 
 template <class Tp>
@@ -35,7 +52,7 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
   using temp_proxied = std::pair<typename ProxyType<typename underlying_value_type::first_type>::type,
                                  typename ProxyType<typename underlying_value_type::second_type>::type>;
   using traits = InterfaceTraits<temp_proxied, static_cast<ConstOption>(is_const)>;
-  using const_traits = InterfaceTraits<typename ProxyType<underlying_value_type>::type, ConstOption::CONST>;
+  using const_traits = InterfaceTraits<temp_proxied, ConstOption::CONST>;
 
  public:
   using key_type = typename traits::key_type;
@@ -97,7 +114,7 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
     }
   }
 
-  iterator find(const value_type& key) const {
+  iterator find(const key_type& key) const {
     auto iter = container_->end();
     if constexpr (IsObjectV<key_type>) {
       auto k_ptr = ObjectCast<underlying_key_type>(key);

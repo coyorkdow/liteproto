@@ -80,8 +80,153 @@ struct StringInterface {
   to_const_t* to_const;
 };
 
-template <class K, class V>
-struct MapInterface {};
+template <class Tp, class Pointer, class Reference,
+          // We make the default arguments of the corresponding const interface the same as the original arguments.
+          // That is because for all non-const interfaces, we will manually specify the const arguments.
+          // As for the const interface, we let it use the default arguments, and it's obvious that the const arguments
+          // of a const interface are the same as the original.
+          class ConstTp = Tp, class ConstPointer = Pointer, class ConstReference = Reference>
+struct MapInterface {
+  using iterator = Iterator<Tp, Pointer, Reference>;
+  using reference = Reference;
+  static_assert(std::is_same_v<typename iterator::value_type, Tp>);
+
+  using key_type = typename PairTraits<Tp>::first_type;
+  using mapped_type = typename PairTraits<Tp>::second_type;
+
+  using insert_t = std::pair<iterator, bool>(const std::any&, const Tp&);
+  using emplace_t = std::pair<iterator, bool>(const std::any&, Tp&&);
+  using find_t = iterator(const std::any&, const key_type&);
+  using erase_t = iterator(const std::any&, iterator);
+  using erase_key_t = std::size_t(const std::any&, const key_type&);
+  using size_t = std::size_t(const std::any&) noexcept;
+  using empty_t = bool(const std::any&) noexcept;
+  using clear_t = void(const std::any&);
+  using begin_t = iterator(const std::any&) noexcept;
+  using end_t = iterator(const std::any&) noexcept;
+
+  using const_interface_t = const ListInterface<ConstTp, ConstPointer, ConstReference>&() noexcept;
+  using to_const_t = std::any(const std::any&) noexcept;
+
+  insert_t* insert;
+  emplace_t* emplace;
+  find_t* find;
+  erase_t* erase;
+  erase_key_t* erase_key;
+  size_t* size;
+  empty_t* empty;
+  clear_t* clear;
+  begin_t* begin;
+  end_t* end;
+  const_interface_t* const_interface;
+  to_const_t* to_const;
+};
+
+template <class Adapter, class Tp, class Pointer, class Reference,
+          // We make the default arguments of the corresponding const interface the same as the original arguments.
+          // That is because for all non-const interfaces, we will manually specify the const arguments.
+          // As for the const interface, we let it use the default arguments, and it's obvious that the const arguments
+          // of a const interface are the same as the original.
+          class ConstTp = Tp, class ConstPointer = Pointer, class ConstReference = Reference>
+struct MapInterfaceImpl {
+  using base = MapInterface<Tp, Pointer, Reference, ConstTp, ConstPointer, ConstReference>;
+  using iterator = typename base::iterator;
+  using reference = typename base::reference;
+  using key_type = typename base::key_type;
+
+  static std::pair<iterator, bool> insert(const std::any& obj, const Tp& v) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).insert(v);
+  }
+  static_assert(std::is_same_v<decltype(insert), typename base::insert_t>);
+
+  static std::pair<iterator, bool> emplace(const std::any& obj, Tp&& v) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).insert(std::move(v));
+  }
+  static_assert(std::is_same_v<decltype(emplace), typename base::emplace_t>);
+
+  static iterator find(const std::any& obj, const key_type& key) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).find(key);
+  }
+  static_assert(std::is_same_v<decltype(find), typename base::find_t>);
+
+  static iterator erase(const std::any& obj, iterator pos) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).erase(std::move(pos));
+  }
+  static_assert(std::is_same_v<decltype(erase), typename base::erase_t>);
+
+  static size_t erase_key(const std::any& obj, iterator pos) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).erase(std::move(pos));
+  }
+  static_assert(std::is_same_v<decltype(erase_key), typename base::erase_key_t>);
+
+  static size_t size(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).size();
+  }
+  static_assert(std::is_same_v<decltype(size), typename base::size_t>);
+
+  static bool empty(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).empty();
+  }
+  static_assert(std::is_same_v<decltype(empty), typename base::empty_t>);
+
+  static void clear(const std::any& obj) {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    (*ptr).clear();
+  }
+  static_assert(std::is_same_v<decltype(clear), typename base::clear_t>);
+
+  static iterator begin(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).begin();
+  }
+  static_assert(std::is_same_v<decltype(begin), typename base::begin_t>);
+
+  static iterator end(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).end();
+  }
+  static_assert(std::is_same_v<decltype(end), typename base::end_t>);
+
+  static std::any ToConst(const std::any& obj) noexcept {
+    auto* ptr = std::any_cast<Adapter>(&obj);
+    return (*ptr).ToConst();
+  }
+  static_assert(std::is_same_v<decltype(ToConst), typename base::to_const_t>);
+
+  static const base& GetInterface() noexcept {
+    static const base inter = [&] {
+      base interface {};
+      interface.insert = &insert;
+      interface.emplace = &emplace;
+      interface.find = &find;
+      interface.erase = &erase;
+      interface.erase_key = &erase_key;
+      interface.size = &size;
+      interface.empty = &empty;
+      interface.clear = &clear;
+      interface.begin = &begin;
+      interface.end = &end;
+      interface.const_interface = &ConstInterface;
+      interface.to_const = &ToConst;
+      return interface;
+    }();
+    return inter;
+  }
+
+  static decltype(auto) ConstInterface() noexcept {
+    using const_adapter = typename Adapter::const_adapter;
+    using impl = MapInterfaceImpl<const_adapter, ConstTp, ConstPointer, ConstReference>;
+    return impl::GetInterface();
+  }
+  static_assert(std::is_same_v<decltype(ConstInterface), typename base::const_interface_t>);
+};
 
 template <class Adapter, class Tp, class Pointer, class Reference,
           // We make the default arguments of the corresponding const interface the same as the original arguments.

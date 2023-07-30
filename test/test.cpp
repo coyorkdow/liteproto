@@ -157,6 +157,11 @@ TEST(TestList, Basic) {
   list = AsList(&cv);
   list.push_back('a');
   EXPECT_EQ(cv[0], 'a');
+
+  // test const
+  auto clist = AsList(static_cast<const std::deque<int>*>(&de));
+  static_assert(std::is_same_v<decltype(clist), List<Number, ConstOption::CONST>>);
+  static_assert(std::is_same_v<typename decltype(clist)::reference, NumberReference<ConstOption::CONST>>);
 }
 
 TEST(TestList, ListOfString) {
@@ -187,6 +192,8 @@ TEST(TestList, ListOfString) {
   EXPECT_EQ(list.size(), 5);
   const auto& cref = strlist;
   auto const_list = AsList(&cref);
+  static_assert(std::is_same_v<typename decltype(const_list)::value_type, Object>);
+  static_assert(std::is_same_v<typename decltype(const_list)::reference, Object>);
   for (size_t i = 0; i < const_list.size(); i++) {
     auto str_interface = StringCast(const_list[i]);
     EXPECT_FALSE(str_interface.has_value());
@@ -238,7 +245,7 @@ TEST(TestList, ListOfString) {
   list.resize(10, GetReflection(&_));
   EXPECT_EQ(anol.size(), 10);
   int pseudo = 0;
-  list.resize(20, GetReflection(&pseudo)); // doesn't work
+  list.resize(20, GetReflection(&pseudo));  // doesn't work
   EXPECT_EQ(list.size(), 10);
   auto iter = std::next(anol.begin(), 5);
   for (int i = 5; i < 10; i++) {
@@ -267,7 +274,7 @@ TEST(TestList, ListOfString) {
   EXPECT_STREQ(StringCast<ConstOption::CONST>(*const_list.begin())->c_str(), "new str");
 }
 
-TEST(TestString, basic) {
+TEST(TestString, Basic) {
   using namespace liteproto;
   std::string stdstr;
   auto str = AsString(&stdstr);
@@ -292,6 +299,28 @@ TEST(TestString, basic) {
     EXPECT_EQ(c, cnt++ + '1');
   }
   cstr = str;
+}
+
+TEST(TestPair, Basic) {
+  using namespace liteproto;
+  std::pair<int, std::string> pis{0, "123"};
+  static_assert(IsSTDpairV<decltype(pis)>);
+  auto p = AsPair(&pis);
+  static_assert(std::is_same_v<decltype(p), Pair<NumberReference<ConstOption::NON_CONST>, Object>>);
+  EXPECT_EQ(0, p.first.AsInt64());
+  p.first.SetInt64(100);
+  EXPECT_EQ(100, pis.first);
+  EXPECT_EQ(Type::STD_STRING, p.second.Descriptor().TypeEnum());
+  auto str = StringCast<ConstOption::NON_CONST>(p.second);
+  EXPECT_TRUE(str.has_value());
+  str.value().append("456");
+  EXPECT_EQ("123456", pis.second);
+
+  auto obj = GetReflection(&pis);
+  EXPECT_EQ(Kind::PAIR, obj.Descriptor().KindEnum());
+  EXPECT_EQ(Type::STD_PAIR, obj.Descriptor().TypeEnum());
+  EXPECT_EQ(Type::INT32, obj.Descriptor().FirstType().TypeEnum());
+  EXPECT_EQ(Type::STD_STRING, obj.Descriptor().SecondType().TypeEnum());
 }
 
 void IterateObject(const liteproto::Object& obj) {

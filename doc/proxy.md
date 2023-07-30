@@ -117,3 +117,8 @@ A `Number` doesn't refer any other object, it has its own value. According to ou
 as it's not a fat pointer. So unlike `Object`, `Number` can not be used as reference. So we propose another type,
 `NumberReference`, to represent the reference of number types. Unlike `Number`, `NumberReference` is not number type, it
 belongs to the indirect type. So it will be proxied by `Object`.
+
+## Make Proxy
+
+Thus, we totally have three proxy types: `Object`, `Number`, and `NumberReference`. Among these types, `Object` and `Number`
+are used for value_type, and `Object` and `NumberReference` are used for reference.

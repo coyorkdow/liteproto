@@ -31,11 +31,11 @@ template <class Tp>
   } else if constexpr (IsArrayV<Tp>) {
     // TODO
   } else if constexpr (IsPairV<Tp>) {
-    // TODO
+    return Object(v, AsPair(v));
   } else {
     return Object(v);
   }
-  std::abort(); // never enter
+  std::abort();  // never enter
 }
 
 template <class Tp>
@@ -64,6 +64,9 @@ inline const TypeDescriptor& TypeMeta<Tp>::GetDescriptor() noexcept {
     inter.transform_ = &Transform;
 
     inter.value_type_ = &ValueType;
+    inter.first_type_ = &FirstType;
+    inter.second_type_ = &SecondType;
+
     inter.is_indirect_type_ = &IsIndirectType;
     inter.default_value_ = &DefaultValue;
     return TypeDescriptor{inter};

@@ -99,7 +99,7 @@ enum class Type : int32_t {
   NUMBER_REFERENCE_NON_CONST,
   NUMBER_REFERENCE_CONST,
 
-  // TODO adc all interface types
+  // TODO add all interface types
   LIST_NON_CONST,
   LIST_CONST,
   STRING_NON_CONST,
@@ -211,6 +211,8 @@ struct DescriptorInterface {
   using extent_t = size_t() noexcept;
 
   using value_type_t = const TypeDescriptor&() noexcept;
+  using first_type_t = const TypeDescriptor&() noexcept;
+  using second_type_t = const TypeDescriptor&() noexcept;
 
   using is_indirect_type_t = bool() noexcept;
   using default_value = std::pair<Object, std::any>() noexcept;
@@ -226,6 +228,8 @@ struct DescriptorInterface {
   extent_t* extent_;
 
   value_type_t* value_type_;
+  first_type_t* first_type_;
+  second_type_t* second_type_;
 
   is_indirect_type_t* is_indirect_type_;
   default_value* default_value_;
@@ -244,7 +248,7 @@ class TypeDescriptor {
   [[nodiscard]] Kind KindEnum() const noexcept { return inter_.kind_enum_(); }
   [[nodiscard]] Type TypeEnum() const noexcept { return inter_.type_enum_(); }
   [[nodiscard]] bool Traits(traits t) const noexcept { return inter_.traits_(t); }
-  [[nodiscard]] TypeDescriptor Transform(transform t) const noexcept { return inter_.transform_(t); }
+  [[nodiscard]] const TypeDescriptor& Transform(transform t) const noexcept { return inter_.transform_(t); }
 
   [[nodiscard]] bool IsIndirectType() const noexcept { return inter_.is_indirect_type_(); }
   [[nodiscard]] inline std::pair<Object, std::any> DefaultValue() const noexcept;
@@ -254,7 +258,9 @@ class TypeDescriptor {
   [[nodiscard]] size_t Rank() const noexcept { return inter_.rank_(); }
   [[nodiscard]] size_t Extent() const noexcept { return inter_.extent_(); }
 
-  [[nodiscard]] TypeDescriptor ValueType() const noexcept { return inter_.value_type_(); }
+  [[nodiscard]] const TypeDescriptor& ValueType() const noexcept { return inter_.value_type_(); }
+  [[nodiscard]] const TypeDescriptor& FirstType() const noexcept { return inter_.first_type_(); }
+  [[nodiscard]] const TypeDescriptor& SecondType() const noexcept { return inter_.second_type_(); }
 
   bool operator==(const TypeDescriptor& rhs) const { return Id() == rhs.Id(); }
   bool operator!=(const TypeDescriptor& rhs) const { return Id() != rhs.Id(); }
@@ -371,9 +377,30 @@ struct TypeMeta {
     } else if constexpr (IsArrayV<Tp>) {
       using traits = ArrayTraits<Tp>;
       return TypeMeta<typename traits::value_type>::GetDescriptor();
+    } else if constexpr (IsMapV<Tp>) {
+      using traits = MapTraits<Tp>;
+      return TypeMeta<typename traits::value_type>::GetDescriptor();
     } else if constexpr (IsPairV<Tp>) {
       using traits = PairTraits<Tp>;
       return TypeMeta<typename traits::value_type>::GetDescriptor();
+    }
+
+    return TypeMeta<void>::GetDescriptor();
+  }
+
+  static constexpr const TypeDescriptor& FirstType() noexcept {
+    if constexpr (IsPairV<Tp>) {
+      using traits = PairTraits<Tp>;
+      return TypeMeta<typename traits::first_type>::GetDescriptor();
+    }
+
+    return TypeMeta<void>::GetDescriptor();
+  }
+
+  static constexpr const TypeDescriptor& SecondType() noexcept {
+    if constexpr (IsPairV<Tp>) {
+      using traits = PairTraits<Tp>;
+      return TypeMeta<typename traits::second_type>::GetDescriptor();
     }
 
     return TypeMeta<void>::GetDescriptor();

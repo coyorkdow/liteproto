@@ -305,7 +305,7 @@ class IteratorAdapter {
   explicit IteratorAdapter(wrapped_iterator&& it) noexcept(noexcept(wrapped_iterator{std::move(it)})) : it_(std::move(it)) {}
 
   reference operator*() const noexcept(noexcept(*it_)) {
-    if constexpr (IsProxyTypeV<reference>) {
+    if constexpr (IsProxyTypeV<value_type>) {
       return MakeProxy<reference>(*it_);
     } else {
       return *it_;
