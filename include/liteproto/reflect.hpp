@@ -74,7 +74,7 @@ inline const TypeDescriptor& TypeMeta<Tp>::GetDescriptor() noexcept {
   return descriptor;
 }
 
-// template <class Tp, ConstOption Opt>
+inline std::pair<Object, std::any> TypeDescriptor::DefaultValue() const noexcept { return inter_.default_value_(); }
 
 template <class Tp, ConstOption Opt>
 std::optional<List<Tp, Opt>> ListCast(const Object& object) noexcept {
@@ -96,6 +96,14 @@ std::optional<String<Opt>> StringCast(const Object& object) noexcept {
   return return_type{*indirect_ptr};
 }
 
-inline std::pair<Object, std::any> TypeDescriptor::DefaultValue() const noexcept { return inter_.default_value_(); }
+template <class First, class Second>
+std::optional<Pair<First, Second>> PairCast(const Object& object) noexcept {
+  using return_type = std::optional<Pair<First, Second>>;
+  auto indirect_ptr = std::any_cast<Pair<First, Second>>(&object.interface_);
+  if (indirect_ptr == nullptr) {
+    return return_type{};
+  }
+  return return_type{*indirect_ptr};
+}
 
 }  // namespace liteproto

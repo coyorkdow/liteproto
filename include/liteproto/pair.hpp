@@ -11,9 +11,6 @@
 
 namespace liteproto {
 
-template <class FT, class ST>
-using Pair = std::pair<FT, ST>;
-
 template <class C, class = std::enable_if_t<IsPairV<C>>>
 auto AsPair(C* pair) noexcept {
   using first_type = typename ProxyType<typename PairTraits<C>::first_type>::type;

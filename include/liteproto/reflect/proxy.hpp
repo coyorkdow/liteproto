@@ -137,7 +137,7 @@ std::optional<Underlying> RestoreFromProxy(Tp&& value) noexcept {
       // If this is an indirect interface, all the modification operations are considered as pass by "move".
       return return_type{std::move(*v_ptr)};
     }
-  } else if constexpr (IsNumberV<rm_refed>) {
+  } else if constexpr (IsNumberV<rm_refed> || IsNumberReferenceV<rm_refed>) {
     if (value.IsSignedInteger()) {
       return return_type{value.AsInt64()};
     } else if (value.IsUnsigned()) {

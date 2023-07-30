@@ -2,10 +2,8 @@
 // Created by Youtao Guo on 2023/6/30.
 //
 
-#include <cassert>
 #include <iostream>
 #include <map>
-#include <numeric>
 #include <tuple>
 #include <type_traits>
 
@@ -305,13 +303,13 @@ TEST(TestPair, Basic) {
   using namespace liteproto;
   std::pair<int, std::string> pis{0, "123"};
   static_assert(IsSTDpairV<decltype(pis)>);
-  auto p = AsPair(&pis);
-  static_assert(std::is_same_v<decltype(p), Pair<NumberReference<ConstOption::NON_CONST>, Object>>);
-  EXPECT_EQ(0, p.first.AsInt64());
-  p.first.SetInt64(100);
+  auto pair = AsPair(&pis);
+  static_assert(std::is_same_v<decltype(pair), Pair<NumberReference<ConstOption::NON_CONST>, Object>>);
+  EXPECT_EQ(0, pair.first.AsInt64());
+  pair.first.SetInt64(100);
   EXPECT_EQ(100, pis.first);
-  EXPECT_EQ(Type::STD_STRING, p.second.Descriptor().TypeEnum());
-  auto str = StringCast<ConstOption::NON_CONST>(p.second);
+  EXPECT_EQ(Type::STD_STRING, pair.second.Descriptor().TypeEnum());
+  auto str = StringCast<ConstOption::NON_CONST>(pair.second);
   EXPECT_TRUE(str.has_value());
   str.value().append("456");
   EXPECT_EQ("123456", pis.second);
@@ -321,6 +319,13 @@ TEST(TestPair, Basic) {
   EXPECT_EQ(Type::STD_PAIR, obj.Descriptor().TypeEnum());
   EXPECT_EQ(Type::INT32, obj.Descriptor().FirstType().TypeEnum());
   EXPECT_EQ(Type::STD_STRING, obj.Descriptor().SecondType().TypeEnum());
+  {
+    auto p = PairCast<NumberReference<ConstOption::NON_CONST>, Object>(obj);
+    ASSERT_TRUE(p.has_value());
+    pair = p.value();
+    EXPECT_EQ(100, p->first.AsInt64());
+    EXPECT_EQ(Type::STD_STRING, p->second.Descriptor().TypeEnum());
+  }
 }
 
 void IterateObject(const liteproto::Object& obj) {
