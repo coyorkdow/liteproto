@@ -106,22 +106,7 @@ static_assert(IsMapV<std::unordered_map<std::string, int>>);
 
 static_assert(IsMapV<std::multimap<int, int>>);
 
-
-using unproxied_pair = std::pair<std::string, int>;
-using unproxied_pair_proxy = ProxyType<unproxied_pair>;
-//static_assert(std::is_same_v<typename unproxied_pair_proxy::type, >);
-
-using some_pair = std::pair<Object, double>;
-static_assert(std::is_same_v<typename InterfaceTraits<some_pair, ConstOption::CONST>::pointer, internal::DummyPointer>);
-static_assert(std::is_same_v<typename InterfaceTraits<some_pair, ConstOption::CONST>::reference, std::pair<Object, const double&>>);
-static_assert(std::is_same_v<typename InterfaceTraits<some_pair, ConstOption::NON_CONST>::reference, std::pair<Object, double&>>);
-
-using another_pair = std::pair<Number, Object>;
-static_assert(std::is_same_v<typename InterfaceTraits<another_pair, ConstOption::CONST>::pointer, internal::DummyPointer>);
-static_assert(std::is_same_v<typename InterfaceTraits<another_pair, ConstOption::CONST>::reference,
-                             std::pair<NumberReference<ConstOption::CONST>, Object>>);
-static_assert(std::is_same_v<typename InterfaceTraits<another_pair, ConstOption::NON_CONST>::reference,
-                             std::pair<NumberReference<ConstOption::NON_CONST>, Object>>);
+static_assert(IsIndirectTypeV<std::pair<std::string, int>>);
 
 #if defined(__cpp_concepts)
 

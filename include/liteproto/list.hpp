@@ -176,7 +176,8 @@ class ListAdapter<Tp, Proxy, std::enable_if_t<IsListV<Tp>>> {
   // What is the ListAdapter for Object supposed to do?
   // It still directly accesses the indirect object inside the class. Only if when visiting through the methods,
   // the adapter creates an Object instance as the proxy of underlying indirect object.
-  using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference>;
+  using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference,
+                                           std::conditional_t<Proxy, MakeProxyWrapper<reference>, IdentityWrapper>>;
   using const_adapter = ListAdapter<const Tp, Proxy, void>;
 
   explicit ListAdapter(container_type* c) noexcept : container_(c) {

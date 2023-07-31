@@ -27,11 +27,10 @@ class Map<K, V, ConstOption::NON_CONST> {
 
   friend class Map<K, V, ConstOption::CONST>;
 
-//  using traits = InterfaceTraits<Tp, ConstOption::NON_CONST>;
-//  using const_traits = InterfaceTraits<Tp, ConstOption::CONST>;
+  //  using traits = InterfaceTraits<Tp, ConstOption::NON_CONST>;
+  //  using const_traits = InterfaceTraits<Tp, ConstOption::CONST>;
 
  public:
-
 };
 
 namespace internal {
@@ -49,23 +48,24 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
   static inline constexpr bool is_const = std::is_const_v<container_type>;
 
  private:
-  using temp_proxied = std::pair<typename ProxyType<typename underlying_value_type::first_type>::type,
-                                 typename ProxyType<typename underlying_value_type::second_type>::type>;
-  using traits = InterfaceTraits<temp_proxied, static_cast<ConstOption>(is_const)>;
-  using const_traits = InterfaceTraits<temp_proxied, ConstOption::CONST>;
+  using key_traits = InterfaceTraits<typename ProxyType<underlying_key_type>::type, ConstOption::CONST>;
+  using mapped_traits = InterfaceTraits<typename ProxyType<underlying_mapped_type>::type, static_cast<ConstOption>(is_const)>;
+  using const_mapped_traits = InterfaceTraits<typename ProxyType<underlying_mapped_type>::type, ConstOption::CONST>;
+  using value_traits = InterfaceTraits<typename ProxyType<underlying_value_type>::type, static_cast<ConstOption>(is_const)>;
+  using const_value_traits = InterfaceTraits<typename ProxyType<underlying_value_type>::type, ConstOption::CONST>;
 
  public:
-  using key_type = typename traits::key_type;
-  using mapped_type = typename traits::mapped_type;
-  using value_type = typename traits::value_type;
-  using pointer = typename traits::pointer;
-  using reference = typename traits::reference;
-  using const_value_type = typename const_traits::value_type;
-  using const_pointer = typename const_traits::pointer;
-  using const_reference = typename const_traits::reference;
+  using key_type = typename key_traits::value_type;
+  using mapped_type = typename map_traits::value_type;
+  using value_type = typename value_traits::value_type;
+  using pointer = DummyPointer;
+  using reference = value_type;
+  using const_value_type = typename const_value_traits::value_type;
+  using const_pointer = DummyPointer;
+  using const_reference = const_value_type;
   using iterator = Iterator<value_type, pointer, reference, std::forward_iterator_tag>;
 
-  using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference>;
+  using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference, PairWrapper<reference>>;
   using const_adapter = MapAdapter<const Tp, void>;
 
   explicit MapAdapter(container_type* c) noexcept : container_(c) {

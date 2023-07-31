@@ -31,7 +31,7 @@ using ConstNumberIterator = Iterator<Number, internal::DummyPointer, NumberRefer
 
 namespace internal {
 
-template <class Container, class Tp, class Pointer, class Reference>
+template <class Container, class Tp, class Pointer, class Reference, class RefAdapter>
 class IteratorAdapter;
 
 template <class Tp, class Pointer, class Reference>
@@ -39,7 +39,6 @@ struct IteratorInterface {
  public:
   using pointer = Pointer;
   using reference = Reference;
-  //  using reference_or_value = typename ReferenceType<Tp>::type;
 
   using indirection_t = reference(const std::any&) noexcept;
   using member_of_object_t = pointer(const std::any&) noexcept;
@@ -169,7 +168,7 @@ class Iterator<Tp, internal::DummyPointer, Reference, Category> : public Iterato
   template <class T, class P, class R, class C>
   friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R, C>&) noexcept;
 
-  template <class Container, class T, class P, class R>
+  template <class Container, class T, class P, class R, class RA>
   friend class internal::IteratorAdapter;
 
   friend class IteratorBase<Tp, internal::DummyPointer, Reference, Category>;
@@ -272,28 +271,19 @@ const IteratorInterface<typename It::value_type, typename It::pointer, typename 
   return inter;
 }
 
-template <class Container, class Tp, class Pointer, class Reference>
+template <class Container, class Tp, class Pointer, class Reference, class RefAdapter>
 class IteratorAdapter {
  public:
   static_assert(!std::is_reference_v<Tp>);
 
- public:
   using value_type = Tp;
   using pointer = Pointer;
   using reference = Reference;
 
-  // Iterator<Container, Object> is special, it is used to iterate an interface of the indirect type.
-  // What should an adapter of the Object iterator do?
-  // The adapter still iterates the underlying container, but returns Object instead of the real value_type.
-  // The Object, as well as all other Interface types, are essentially some sort of fat pointers.
-  // We don't store any additional data in the adapter. Instead, the Object returned by adapter is created when the
-  // corresponding method is called. Therefore, the return type of indirection operator is value type, not
-  // reference_or_value type.
-  static_assert(IsProxyTypeV<value_type> || std::is_reference_v<reference>,
-                "IteratorAdapter uses reference_or_value for all types except Object or Number");
   using container_type = Container;
   using wrapped_iterator =
       std::conditional_t<std::is_const_v<container_type>, typename container_type::const_iterator, typename container_type::iterator>;
+  static_assert(std::is_same_v<std::invoke_result_t<RefAdapter, typename wrapped_iterator::reference>, Reference>);
 
   explicit IteratorAdapter(const wrapped_iterator& it) noexcept(noexcept(wrapped_iterator{it})) : it_(it) {
     static_assert(IsProxyTypeV<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
@@ -304,20 +294,13 @@ class IteratorAdapter {
   }
   explicit IteratorAdapter(wrapped_iterator&& it) noexcept(noexcept(wrapped_iterator{std::move(it)})) : it_(std::move(it)) {}
 
-  reference operator*() const noexcept(noexcept(*it_)) {
-    if constexpr (IsProxyTypeV<value_type>) {
-      return MakeProxy<reference>(*it_);
-    } else {
-      return *it_;
-    }
-  }
+  reference operator*() const noexcept(noexcept(*it_)) { return RefAdapter{}(*it_); }
 
   pointer operator->() const noexcept(noexcept(it_.operator->())) {
-    if constexpr (!IsProxyTypeV<value_type>) {
-      return it_.operator->();
-    } else {
-      // If the value_type is Object or Number, do nothing. And it's assured that this method will never be called.
+    if constexpr (std::is_same_v<pointer, DummyPointer>) {
       return nullptr;
+    } else {
+      return it_.operator->();
     }
   }
 
@@ -356,25 +339,6 @@ class IteratorAdapter {
 
  private:
   wrapped_iterator it_;
-};
-
-//// Iterators of the Object with CV-qualified don't satisfies our semantics, disable them.
-template <class Container, class P, class R>
-class IteratorAdapter<Container, const Object, P, R> {
- public:
-  IteratorAdapter() = delete;
-};
-
-template <class Container, class P, class R>
-class IteratorAdapter<Container, volatile Object, P, R> {
- public:
-  IteratorAdapter() = delete;
-};
-
-template <class Container, class P, class R>
-class IteratorAdapter<Container, const volatile Object, P, R> {
- public:
-  IteratorAdapter() = delete;
 };
 
 }  // namespace internal

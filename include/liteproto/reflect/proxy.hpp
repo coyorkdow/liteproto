@@ -36,7 +36,7 @@ struct IsProxyType : std::disjunction<IsNumber<Tp>, IsObject<Tp>, IsNumberRefere
 template <class Tp>
 inline constexpr bool IsProxyTypeV = IsProxyType<Tp>::value;
 
-template <class Tp, ConstOption Opt, class Cond = void>
+template <class Tp, ConstOption Opt>
 struct InterfaceTraits {
   using value_type = std::conditional_t<Opt == ConstOption::CONST, const Tp, Tp>;
   using pointer = value_type*;
@@ -57,41 +57,6 @@ struct InterfaceTraits<Number, Opt> {
   using reference = NumberReference<Opt>;
 };
 
-namespace details {
-
-template <class K, class V, ConstOption Opt, class Cond = void>
-struct InterfaceTraitsHelper;
-
-template <class K, class V>
-struct InterfaceTraitsHelper<K, V, ConstOption::NON_CONST, std::enable_if_t<!IsProxyTypeV<K> && !IsProxyTypeV<V>>> {
-  using pointer = std::pair<K, V>*;
-  using reference = std::pair<K, V>&;
-};
-
-template <class K, class V>
-struct InterfaceTraitsHelper<K, V, ConstOption::CONST, std::enable_if_t<!IsProxyTypeV<K> && !IsProxyTypeV<V>>> {
-  using pointer = const std::pair<K, V>*;
-  using reference = const std::pair<K, V>&;
-};
-
-template <class K, class V, ConstOption Opt>
-struct InterfaceTraitsHelper<K, V, Opt, std::enable_if_t<IsProxyTypeV<K> || IsProxyTypeV<V>>> {
-  using pointer = internal::DummyPointer;
-  using reference = std::pair<typename InterfaceTraits<K, Opt>::reference, typename InterfaceTraits<V, Opt>::reference>;
-};
-}  // namespace details
-
-template <class Tp, ConstOption Opt>
-struct InterfaceTraits<Tp, Opt, std::enable_if_t<IsPairV<Tp>>> {
- private:
-  using key_type = typename PairTraits<Tp>::first_type;
-  using mapped_type = typename PairTraits<Tp>::second_type;
-
- public:
-  using pointer = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::pointer;
-  using reference = typename details::InterfaceTraitsHelper<key_type, mapped_type, Opt>::reference;
-};
-
 template <class Proxy, class Tp, class = std::enable_if_t<IsObjectV<Proxy> || IsNumberReferenceV<Proxy>>>
 Proxy MakeProxy(Tp&& value) noexcept {
   if constexpr (IsObjectV<Proxy>) {
@@ -99,19 +64,27 @@ Proxy MakeProxy(Tp&& value) noexcept {
   } else if constexpr (IsNumberReferenceV<Proxy>) {
     return Proxy{value};
   }
-  //  else {
-  //    static_assert(IsPairV<Proxy>);
-  //    using first_type = typename PairTraits<Proxy>::first_type;
-  //    using second_type = typename PairTraits<Proxy>::second_type;
-  //    if constexpr (IsProxyTypeV<first_type> && IsProxyTypeV<second_type>) {
-  //      return Proxy{MakeProxy<first_type>(value.first), MakeProxy<first_type>(value.second)};
-  //    } else if constexpr (IsProxyTypeV<first_type>) {
-  //      return Proxy{MakeProxy<first_type>(value.first), value.second};
-  //    } else {
-  //      return Proxy{value.first, MakeProxy<second_type>(value.second)};
-  //    }
-  //  }
 }
+
+template <class Proxy>
+struct MakeProxyWrapper {
+  template <class Tp>
+  Proxy operator()(Tp&& value) noexcept {
+    return MakeProxy<Proxy>(std::forward<Tp>(value));
+  }
+};
+
+struct IdentityWrapper {
+  template <class Tp>
+  decltype(auto) operator()(Tp&& value) noexcept {
+    return std::forward<Tp>(value);
+  }
+};
+
+template <class Pair,  class = std::enable_if_t<IsPairV<Pair>>>
+struct PairWrapper {
+  // TODO
+};
 
 template <class Underlying, class Tp, class = std::enable_if_t<IsProxyTypeV<std::remove_reference_t<Tp>>>>
 std::optional<Underlying> RestoreFromProxy(Tp&& value) noexcept;
