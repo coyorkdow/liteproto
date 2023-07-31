@@ -132,7 +132,7 @@ class Iterator : public IteratorBase<Tp, Pointer, Reference, Category> {
   template <class T, class P, class R, class C>
   friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R, C>&) noexcept;
 
-  template <class Container, class T, class P, class R>
+  template <class Container, class T, class P, class R, class RA>
   friend class internal::IteratorAdapter;
 
   friend class IteratorBase<Tp, Pointer, Reference, Category>;
