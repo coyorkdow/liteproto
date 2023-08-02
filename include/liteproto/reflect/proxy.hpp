@@ -81,24 +81,18 @@ struct IdentityWrapper {
   }
 };
 
-template <class Pair,  class = std::enable_if_t<IsPairV<Pair>>>
+template <class ProxyPair, class = std::enable_if_t<IsPairV<ProxyPair>>>
 struct PairWrapper {
-  // TODO
+  template <class Pair, class = std::enable_if_t<IsPairV<std::remove_reference_t<Pair>>>>
+  ProxyPair operator()(Pair&& pair) noexcept {
+    using first_type = typename PairTraits<ProxyPair>::first_type;
+    using second_type = typename PairTraits<ProxyPair>::second_type;
+    return ProxyPair{MakeProxy<first_type>(std::forward<Pair>(pair).first, MakeProxy<second_type>(std::forward<Pair>(pair).second))};
+  }
 };
 
 template <class Underlying, class Tp, class = std::enable_if_t<IsProxyTypeV<std::remove_reference_t<Tp>>>>
 std::optional<Underlying> RestoreFromProxy(Tp&& value) noexcept;
-
-namespace details {
-template <class Underlying, class Tp>
-auto RestoreFromProxyHelper(Tp&& value) noexcept {
-  if constexpr (IsProxyTypeV<std::remove_reference_t<Tp>>) {
-    return RestoreFromProxy<Underlying>(std::forward<Tp>(value));
-  } else {
-    return std::optional<Underlying>(std::forward<Tp>(value));
-  }
-}
-}  // namespace details
 
 template <class Underlying, class Tp, class>
 std::optional<Underlying> RestoreFromProxy(Tp&& value) noexcept {
@@ -119,25 +113,6 @@ std::optional<Underlying> RestoreFromProxy(Tp&& value) noexcept {
       return return_type{value.AsFloat64()};
     }
   }
-  //  else {
-  //    static_assert(IsPairV<rm_refed> && IsProxyTypeV<Underlying>);
-  //    using first_type = typename PairTraits<Underlying>::first_type;
-  //    using second_type = typename PairTraits<Underlying>::second_type;
-  //    if constexpr (std::is_rvalue_reference_v<decltype(value)>) {
-  //      auto first = details::RestoreFromProxyHelper<first_type>(std::move(value.first));
-  //      auto second = details::RestoreFromProxyHelper<second_type>(std::move(value.second));
-  //      if (first.has_value() && second.has_value()) {
-  //        return return_type{std::in_place, std::move(first.value()), std::move(second.value())};
-  //      }
-  //    } else {
-  //      auto first = details::RestoreFromProxyHelper<first_type>(value.first);
-  //      auto second = details::RestoreFromProxyHelper<second_type>(value.second);
-  //      if (first.has_value() && second.has_value()) {
-  //        return return_type{std::in_place, std::move(first.value()), std::move(second.value())};
-  //      }
-  //    }
-  //  }
-
   return return_type{};
 }
 

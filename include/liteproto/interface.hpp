@@ -20,7 +20,7 @@ template <class Tp, class Pointer, class Reference,
           // of a const interface are the same as the original.
           class ConstTp = Tp, class ConstPointer = Pointer, class ConstReference = Reference>
 struct ListInterface {
-  using iterator = Iterator<Tp, Pointer, Reference>;
+  using iterator = Iterator<Tp, Pointer, Reference, std::bidirectional_iterator_tag>;
   using reference = Reference;
   static_assert(std::is_same_v<typename iterator::value_type, Tp>);
 
@@ -65,7 +65,7 @@ struct ListInterface {
 // our interface.
 template <class Tp>
 struct StringInterface {
-  using iterator = Iterator<Tp, Tp*, Tp&>;
+  using iterator = Iterator<Tp, Tp*, Tp&, std::bidirectional_iterator_tag>;
   using c_str_t = const Tp*(const std::any&) noexcept;
   using append_t = void(const std::any&, const Tp*, std::size_t);
   using data_t = Tp*(const std::any&) noexcept;
@@ -87,7 +87,7 @@ template <class Tp, class Pointer, class Reference,
           // of a const interface are the same as the original.
           class ConstTp = Tp, class ConstPointer = Pointer, class ConstReference = Reference>
 struct MapInterface {
-  using iterator = Iterator<Tp, Pointer, Reference>;
+  using iterator = Iterator<Tp, Pointer, Reference, std::forward_iterator_tag>;
   using reference = Reference;
   static_assert(std::is_same_v<typename iterator::value_type, Tp>);
 
@@ -105,7 +105,7 @@ struct MapInterface {
   using begin_t = iterator(const std::any&) noexcept;
   using end_t = iterator(const std::any&) noexcept;
 
-  using const_interface_t = const ListInterface<ConstTp, ConstPointer, ConstReference>&() noexcept;
+  using const_interface_t = const MapInterface<ConstTp, ConstPointer, ConstReference>&() noexcept;
   using to_const_t = std::any(const std::any&) noexcept;
 
   insert_t* insert;
@@ -158,9 +158,9 @@ struct MapInterfaceImpl {
   }
   static_assert(std::is_same_v<decltype(erase), typename base::erase_t>);
 
-  static size_t erase_key(const std::any& obj, iterator pos) {
+  static size_t erase_key(const std::any& obj, const key_type& key) {
     auto* ptr = std::any_cast<Adapter>(&obj);
-    return (*ptr).erase(std::move(pos));
+    return (*ptr).erase(key);
   }
   static_assert(std::is_same_v<decltype(erase_key), typename base::erase_key_t>);
 
@@ -429,6 +429,18 @@ template <class Adapter>
 decltype(auto) GetStringInterface() noexcept {
   using value_type = typename Adapter::value_type;
   using impl = StringInterfaceImpl<Adapter, value_type>;
+  return impl::GetInterface();
+}
+
+template <class Adapter>
+decltype(auto) GetMapInterface() noexcept {
+  using value_type = typename Adapter::value_type;
+  using pointer = typename Adapter::pointer;
+  using reference = typename Adapter::reference;
+  using const_value_type = typename Adapter::const_value_type;
+  using const_pointer = typename Adapter::const_pointer;
+  using const_reference = typename Adapter::const_reference;
+  using impl = MapInterfaceImpl<Adapter, value_type, pointer, reference, const_value_type, const_pointer, const_reference>;
   return impl::GetInterface();
 }
 

@@ -14,7 +14,7 @@
 
 namespace liteproto {
 
-template <class Tp, class Pointer, class Reference, class Category = std::bidirectional_iterator_tag>
+template <class Tp, class Pointer, class Reference, class Category>
 class Iterator;
 
 template <class Tp, class Category = std::bidirectional_iterator_tag>
@@ -31,10 +31,10 @@ using ConstNumberIterator = Iterator<Number, internal::DummyPointer, NumberRefer
 
 namespace internal {
 
-template <class Container, class Tp, class Pointer, class Reference, class RefAdapter>
+template <class Container, class Tp, class Pointer, class Reference, class Category, class RefAdapter>
 class IteratorAdapter;
 
-template <class Tp, class Pointer, class Reference>
+template <class Tp, class Pointer, class Reference, class Category>
 struct IteratorInterface {
  public:
   using pointer = Pointer;
@@ -44,7 +44,7 @@ struct IteratorInterface {
   using member_of_object_t = pointer(const std::any&) noexcept;
   using increment_t = void(std::any&);
   using decrement_t = void(std::any&);
-  using noteq_t = bool(const std::any&, const Iterator<Tp, pointer, reference>&) noexcept;
+  using noteq_t = bool(const std::any&, const Iterator<Tp, pointer, reference, Category>&) noexcept;
 
   using adapter_type_id_t = uint64_t(const std::any&) noexcept;
   indirection_t* indirection;
@@ -55,8 +55,8 @@ struct IteratorInterface {
   adapter_type_id_t* adapter_type_id;
 };
 
-template <class IteratorAdapter, class Tp, class Pointer, class Reference, class Category = std::bidirectional_iterator_tag>
-auto MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp, Pointer, Reference>& inter) noexcept;
+template <class Category, class IteratorAdapter, class Tp, class Pointer, class Reference>
+auto MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<Tp, Pointer, Reference, Category>& inter) noexcept;
 
 template <class Tp, class Pointer, class Reference, class Category>
 std::any& GetIteratorAdapter(Iterator<Tp, Pointer, Reference, Category>&) noexcept;
@@ -68,6 +68,7 @@ const std::any& GetIteratorAdapter(const Iterator<Tp, Pointer, Reference, Catego
 
 template <class Tp, class Pointer, class Reference, class Category>
 class IteratorBase {
+ protected:
   using iterator = Iterator<Tp, Pointer, Reference, Category>;
 
  public:
@@ -75,9 +76,9 @@ class IteratorBase {
   using difference_type = std::ptrdiff_t;
   using pointer = Pointer;
   using reference = Reference;
-  using iterator_category = std::bidirectional_iterator_tag;
+  using iterator_category = Category;
 
-  using interface = internal::IteratorInterface<value_type, pointer, reference>;
+  using interface = internal::IteratorInterface<value_type, pointer, reference, iterator_category>;
 
   reference operator*() noexcept { return interface_->indirection(it_); }
 
@@ -88,16 +89,6 @@ class IteratorBase {
   iterator operator++(int) {
     Iterator old{*this};
     ++(*this);
-    return old;
-  }
-
-  auto operator--() -> std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag, Category>, iterator&> {
-    interface_->decrement(it_);
-    return static_cast<iterator&>(*this);
-  }
-  auto operator--(int) -> std::enable_if_t<std::is_base_of_v<std::bidirectional_iterator_tag, Category>, iterator> {
-    Iterator old{*this};
-    --(*this);
     return old;
   }
 
@@ -122,9 +113,39 @@ class IteratorBase {
 };
 
 template <class Tp, class Pointer, class Reference, class Category>
-class Iterator : public IteratorBase<Tp, Pointer, Reference, Category> {
-  template <class IteratorAdapter, class T, class P, class R, class C>
-  friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R>& inter) noexcept;
+class IteratorCategoryBase : public IteratorBase<Tp, Pointer, Reference, Category> {
+  using base = IteratorBase<Tp, Pointer, Reference, Category>;
+
+ protected:
+  template <class... Args>
+  IteratorCategoryBase(Args&&... args) noexcept : base(std::forward<Args>(args)...) {}
+};
+
+template <class Tp, class Pointer, class Reference>
+class IteratorCategoryBase<Tp, Pointer, Reference, std::bidirectional_iterator_tag>
+    : public IteratorBase<Tp, Pointer, Reference, std::bidirectional_iterator_tag> {
+  using base = IteratorBase<Tp, Pointer, Reference, std::bidirectional_iterator_tag>;
+
+ public:
+  typename base::iterator& operator--() {
+    base::interface_->decrement(base::it_);
+    return static_cast<typename base::iterator&>(*this);
+  }
+  typename base::iterator operator--(int) {
+    Iterator old{*this};
+    --(*this);
+    return old;
+  }
+
+ protected:
+  template <class... Args>
+  IteratorCategoryBase(Args&&... args) noexcept : base(std::forward<Args>(args)...) {}
+};
+
+template <class Tp, class Pointer, class Reference, class Category>
+class Iterator : public IteratorCategoryBase<Tp, Pointer, Reference, Category> {
+  template <class C, class IteratorAdapter, class T, class P, class R>
+  friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R, C>& inter) noexcept;
 
   template <class T, class P, class R, class C>
   friend std::any& internal::GetIteratorAdapter(Iterator<T, P, R, C>&) noexcept;
@@ -132,11 +153,12 @@ class Iterator : public IteratorBase<Tp, Pointer, Reference, Category> {
   template <class T, class P, class R, class C>
   friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R, C>&) noexcept;
 
-  template <class Container, class T, class P, class R, class RA>
+  template <class Container, class T, class P, class R, class C, class RA>
   friend class internal::IteratorAdapter;
 
   friend class IteratorBase<Tp, Pointer, Reference, Category>;
   using base = IteratorBase<Tp, Pointer, Reference, Category>;
+  using category_base = IteratorCategoryBase<Tp, Pointer, Reference, Category>;
 
  public:
   Iterator() = default;
@@ -151,16 +173,17 @@ class Iterator : public IteratorBase<Tp, Pointer, Reference, Category> {
 
  private:
   template <class ItAdapter>
-  Iterator(ItAdapter&& it, const typename base::interface& inter) noexcept : base(std::forward<ItAdapter>(it), inter) {}
+  Iterator(ItAdapter&& it, const typename base::interface& inter) noexcept : category_base(std::forward<ItAdapter>(it), inter) {}
 
-  explicit Iterator(const base& iterator) : base(iterator) {}
-  explicit Iterator(base&& iterator) noexcept : base(std::move(iterator)) {}
+  explicit Iterator(const base& iterator) : category_base(iterator) {}
+  explicit Iterator(base&& iterator) noexcept : category_base(std::move(iterator)) {}
 };
 
 template <class Tp, class Reference, class Category>
-class Iterator<Tp, internal::DummyPointer, Reference, Category> : public IteratorBase<Tp, internal::DummyPointer, Reference, Category> {
-  template <class IteratorAdapter, class T, class P, class R, class C>
-  friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R>& inter) noexcept;
+class Iterator<Tp, internal::DummyPointer, Reference, Category>
+    : public IteratorCategoryBase<Tp, internal::DummyPointer, Reference, Category> {
+  template <class C, class IteratorAdapter, class T, class P, class R>
+  friend auto internal::MakeIterator(IteratorAdapter&& it, const internal::IteratorInterface<T, P, R, C>& inter) noexcept;
 
   template <class T, class P, class R, class C>
   friend std::any& internal::GetIteratorAdapter(Iterator<T, P, R, C>&) noexcept;
@@ -168,11 +191,12 @@ class Iterator<Tp, internal::DummyPointer, Reference, Category> : public Iterato
   template <class T, class P, class R, class C>
   friend const std::any& internal::GetIteratorAdapter(const Iterator<T, P, R, C>&) noexcept;
 
-  template <class Container, class T, class P, class R, class RA>
+  template <class Container, class T, class P, class R, class C, class RA>
   friend class internal::IteratorAdapter;
 
   friend class IteratorBase<Tp, internal::DummyPointer, Reference, Category>;
   using base = IteratorBase<Tp, internal::DummyPointer, Reference, Category>;
+  using category_base = IteratorCategoryBase<Tp, internal::DummyPointer, Reference, Category>;
 
  public:
   Iterator() = default;
@@ -186,16 +210,16 @@ class Iterator<Tp, internal::DummyPointer, Reference, Category> : public Iterato
 
  private:
   template <class ItAdapter>
-  Iterator(ItAdapter&& it, const typename base::interface& inter) noexcept : base(std::forward<ItAdapter>(it), inter) {}
+  Iterator(ItAdapter&& it, const typename base::interface& inter) noexcept : category_base(std::forward<ItAdapter>(it), inter) {}
 
-  explicit Iterator(const base& iterator) : base(iterator) {}
-  explicit Iterator(base&& iterator) noexcept : base(std::move(iterator)) {}
+  explicit Iterator(const base& iterator) : category_base(iterator) {}
+  explicit Iterator(base&& iterator) noexcept : category_base(std::move(iterator)) {}
 };
 
 namespace internal {
 
-template <class IteratorAdapter, class Tp, class Pointer, class Reference, class Category>
-auto MakeIterator(IteratorAdapter&& it, const IteratorInterface<Tp, Pointer, Reference>& inter) noexcept {
+template <class Category, class IteratorAdapter, class Tp, class Pointer, class Reference>
+auto MakeIterator(IteratorAdapter&& it, const IteratorInterface<Tp, Pointer, Reference, Category>& inter) noexcept {
   return Iterator<Tp, Pointer, Reference, Category>(std::forward<IteratorAdapter>(it), inter);
 }
 
@@ -209,9 +233,9 @@ const std::any& GetIteratorAdapter(const Iterator<Tp, Pointer, Reference, Catego
   return iterator.it_;
 }
 
-template <class It, class Tp, class Pointer, class Reference>
+template <class It, class Tp, class Pointer, class Reference, class Category>
 struct IteratorInterfaceImpl {
-  using base = IteratorInterface<Tp, Pointer, Reference>;
+  using base = IteratorInterface<Tp, Pointer, Reference, Category>;
   using pointer = typename base::pointer;
   using reference = typename base::reference;
 
@@ -239,7 +263,7 @@ struct IteratorInterfaceImpl {
   }
   static_assert(std::is_same_v<decltype(Decrement), typename base::decrement_t>);
 
-  static bool NotEq(const std::any& obj, const Iterator<Tp, Pointer, Reference>& rhs) noexcept {
+  static bool NotEq(const std::any& obj, const Iterator<Tp, Pointer, Reference, Category>& rhs) noexcept {
     auto* ptr = std::any_cast<It>(&obj);
     return (*ptr) != rhs;
   }
@@ -253,13 +277,15 @@ struct IteratorInterfaceImpl {
 };
 
 template <class It>
-const IteratorInterface<typename It::value_type, typename It::pointer, typename It::reference>& GetIteratorInterface() noexcept {
+auto GetIteratorInterface() noexcept
+    -> const IteratorInterface<typename It::value_type, typename It::pointer, typename It::reference, typename It::iterator_category>& {
   using value_type = typename It::value_type;
   using pointer = typename It::pointer;
   using reference = typename It::reference;
-  using impl = IteratorInterfaceImpl<It, value_type, pointer, reference>;
-  static const IteratorInterface<value_type, pointer, reference> inter = [&] {
-    IteratorInterface<value_type, pointer, reference> interface {};
+  using iterator_category = typename It::iterator_category;
+  using impl = IteratorInterfaceImpl<It, value_type, pointer, reference, iterator_category>;
+  static const IteratorInterface<value_type, pointer, reference, iterator_category> inter = [&] {
+    IteratorInterface<value_type, pointer, reference, iterator_category> interface {};
     interface.indirection = &impl::Indirection;
     interface.member_of_object = &impl::MemberOfObject;
     interface.increment = &impl::Increment;
@@ -271,7 +297,7 @@ const IteratorInterface<typename It::value_type, typename It::pointer, typename 
   return inter;
 }
 
-template <class Container, class Tp, class Pointer, class Reference, class RefAdapter>
+template <class Container, class Tp, class Pointer, class Reference, class Category, class RefAdapter>
 class IteratorAdapter {
  public:
   static_assert(!std::is_reference_v<Tp>);
@@ -279,6 +305,7 @@ class IteratorAdapter {
   using value_type = Tp;
   using pointer = Pointer;
   using reference = Reference;
+  using iterator_category = Category;
 
   using container_type = Container;
   using wrapped_iterator =
@@ -311,7 +338,7 @@ class IteratorAdapter {
     }
   }
 
-  bool operator!=(const Iterator<value_type, pointer, reference>& rhs) const noexcept {
+  bool operator!=(const Iterator<value_type, pointer, reference, iterator_category>& rhs) const noexcept {
     if (AdapterTypeId() != rhs.AdapterTypeId()) {
       return true;
     }

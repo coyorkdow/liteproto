@@ -328,6 +328,12 @@ TEST(TestPair, Basic) {
   }
 }
 
+TEST(TestMap, Basic) {
+  using namespace liteproto;
+  std::map<int, double> mid;
+//  auto map = AsMap(&mid);
+}
+
 void IterateObject(const liteproto::Object& obj) {
   using namespace liteproto;
   auto descriptor = obj.Descriptor();
