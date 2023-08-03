@@ -87,7 +87,7 @@ struct PairWrapper {
   ProxyPair operator()(Pair&& pair) noexcept {
     using first_type = typename PairTraits<ProxyPair>::first_type;
     using second_type = typename PairTraits<ProxyPair>::second_type;
-    return ProxyPair{MakeProxy<first_type>(std::forward<Pair>(pair).first, MakeProxy<second_type>(std::forward<Pair>(pair).second))};
+    return ProxyPair{MakeProxy<first_type>(std::forward<Pair>(pair).first), MakeProxy<second_type>(std::forward<Pair>(pair).second)};
   }
 };
 

@@ -331,7 +331,14 @@ TEST(TestPair, Basic) {
 TEST(TestMap, Basic) {
   using namespace liteproto;
   std::map<int, double> mid;
-//  auto map = AsMap(&mid);
+  auto map = AsMap(&mid);
+
+  map.insert(std::pair<Number, Number>{});
+  ASSERT_EQ(1, mid.size());
+  EXPECT_EQ(0, (*map.find(Number{})).second.AsInt64());
+  EXPECT_TRUE(map.find(Number{}) != map.end());
+  EXPECT_TRUE(map.find(Number{}) == map.begin());
+  EXPECT_TRUE(map.find(Number{1}) == map.end());
 }
 
 void IterateObject(const liteproto::Object& obj) {

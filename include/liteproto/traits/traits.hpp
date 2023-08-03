@@ -257,6 +257,14 @@ struct MapTraits<C<K, V, Tps...>, std::enable_if_t<internal::is_map_v<C<K, V, Tp
   using container_type = C<K, V, Tps...>;
 };
 
+template <template <class, class, auto...> class C, class K, class V, auto... Args>
+struct MapTraits<C<K, V, Args...>, std::enable_if_t<internal::is_map_v<C<K, V, Args...>, K, V>>> {
+  using key_type = K;
+  using mapped_type = V;
+  using value_type = std::pair<const K, V>;
+  using container_type = C<K, V, Args...>;
+};
+
 template <class Tp>
 struct MapTraits<Tp, std::void_t<std::enable_if_t<std::is_const_v<Tp> || std::is_volatile_v<Tp>>,
                                  typename MapTraits<std::remove_cv_t<Tp>>::value_type>> {

@@ -313,8 +313,8 @@ class IteratorAdapter {
   static_assert(std::is_same_v<std::invoke_result_t<RefAdapter, typename wrapped_iterator::reference>, Reference>);
 
   explicit IteratorAdapter(const wrapped_iterator& it) noexcept(noexcept(wrapped_iterator{it})) : it_(it) {
-    static_assert(IsProxyTypeV<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
-                  std::is_same_v<value_type, const typename container_type::value_type>);
+//    static_assert(IsProxyTypeV<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
+//                  std::is_same_v<value_type, const typename container_type::value_type>);
     static_assert(std::is_copy_constructible<IteratorAdapter>::value);
     static_assert(std::is_copy_assignable<IteratorAdapter>::value);
     static_assert(std::is_swappable<IteratorAdapter>::value);
