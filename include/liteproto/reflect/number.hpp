@@ -26,7 +26,7 @@ class Number {
   template <ConstOption Opt>
   inline Number(const NumberReference<Opt>& ref) noexcept;
 
-  bool IsSignedInteger() const noexcept { return descriptor_->Traits(traits::is_signed); }
+  bool IsSignedInteger() const noexcept { return !IsFloating() && descriptor_->Traits(traits::is_signed); }
   bool IsUnsigned() const noexcept { return descriptor_->Traits(traits::is_unsigned); }
   bool IsFloating() const noexcept { return descriptor_->Traits(traits::is_floating_point); }
 
@@ -43,9 +43,9 @@ class Number {
     descriptor_ = &TypeMeta<double>::GetDescriptor();
   }
 
-  int64_t AsInt64() const noexcept { return int64_; }
-  uint64_t AsUInt64() const noexcept { return uint64_; }
-  double AsFloat64() const noexcept { return float64_; }
+  int64_t AsInt64() const noexcept { return As<int64_t>(); }
+  uint64_t AsUInt64() const noexcept { return As<uint64_t>(); }
+  double AsFloat64() const noexcept { return As<double>(); }
 
   template <class Arithmetic, class = std::enable_if_t<std::is_arithmetic_v<Arithmetic>>>
   explicit operator Arithmetic() const noexcept {
@@ -61,6 +61,17 @@ class Number {
   const TypeDescriptor& Descriptor() const noexcept { return *descriptor_; }
 
  private:
+  template <class V, class = std::enable_if_t<std::disjunction_v<std::is_unsigned<V>, std::is_signed<V>, std::is_floating_point<V>>>>
+  V As() const noexcept {
+    if (IsFloating()) {
+      return static_cast<V>(float64_);
+    } else if (IsSignedInteger()) {
+      return static_cast<V>(int64_);
+    } else {
+      return static_cast<V>(uint64_);
+    }
+  }
+
   union {
     int64_t int64_;
     uint64_t uint64_;
@@ -170,7 +181,7 @@ class NumberReference<ConstOption::NON_CONST> {
   }
 
   const TypeDescriptor& Descriptor() const noexcept { return interface_->descriptor(ptr_); }
-  bool IsSignedInteger() const noexcept { return Descriptor().Traits(traits::is_signed); }
+  bool IsSignedInteger() const noexcept { return !IsFloating() && Descriptor().Traits(traits::is_signed); }
   bool IsUnsigned() const noexcept { return Descriptor().Traits(traits::is_unsigned); }
   bool IsFloating() const noexcept { return Descriptor().Traits(traits::is_floating_point); }
 
@@ -211,7 +222,7 @@ class NumberReference<ConstOption::CONST> {
   }
 
   const TypeDescriptor& Descriptor() const noexcept { return interface_->descriptor(ptr_); }
-  bool IsSignedInteger() const noexcept { return Descriptor().Traits(traits::is_signed); }
+  bool IsSignedInteger() const noexcept { return !IsFloating() && Descriptor().Traits(traits::is_signed); }
   bool IsUnsigned() const noexcept { return Descriptor().Traits(traits::is_unsigned); }
   bool IsFloating() const noexcept { return Descriptor().Traits(traits::is_floating_point); }
 

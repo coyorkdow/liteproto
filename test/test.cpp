@@ -28,6 +28,7 @@ TEST(TestNumber, Basic) {
   EXPECT_TRUE((n.Descriptor().TypeEnum() == Type::FLOAT32) || (n.Descriptor().TypeEnum() == Type::FLOAT64));
   EXPECT_EQ(n.Descriptor().KindEnum(), Kind::NUMBER);
   EXPECT_TRUE(n.IsFloating());
+  EXPECT_EQ(n.AsInt64(), 3);
   EXPECT_DOUBLE_EQ(n.AsFloat64(), 3.14159);
   EXPECT_DOUBLE_EQ(static_cast<double>(n), 3.14159);
   n = std::numeric_limits<int32_t>::min();
@@ -56,6 +57,7 @@ TEST(TestNumber, Reference) {
   NumberReference ref = n;
   static_assert(std::is_same_v<decltype(ref), NumberReference<ConstOption::NON_CONST>>);
   ref.SetFloat64(3.14159);
+  EXPECT_EQ(3, ref.AsInt64());
   EXPECT_DOUBLE_EQ(static_cast<double>(n), 3.14159);
   int i = -1;
   ref = i;  // change binding
@@ -69,6 +71,8 @@ TEST(TestNumber, Reference) {
   cref = f;  // change binding
   EXPECT_FLOAT_EQ(cref.AsFloat64(), 0.1);
   EXPECT_DOUBLE_EQ(cref_of_n.AsFloat64(), 3.14159);
+  f = 10.24;
+  EXPECT_EQ(cref.AsUInt64(), 10);
 }
 
 TEST(TestNumber, NumberIsNumber) {
@@ -339,6 +343,21 @@ TEST(TestMap, Basic) {
   EXPECT_TRUE(map.find(Number{}) != map.end());
   EXPECT_TRUE(map.find(Number{}) == map.begin());
   EXPECT_TRUE(map.find(Number{1}) == map.end());
+  auto it = map.find(0);
+  EXPECT_TRUE((*it).second.IsFloating());
+  (*it).second.SetFloat64(4.55);
+  map.insert(std::make_pair(Number{1}, Number{2}));
+  EXPECT_EQ(2, map.size());
+  EXPECT_FALSE(map.empty());
+  for (auto [key, value] : map) {
+    EXPECT_TRUE(key.IsSignedInteger());
+    EXPECT_TRUE(value.IsFloating() && !value.IsSignedInteger() && !value.IsUnsigned());
+    if (key.AsInt64() == 0) {
+      EXPECT_DOUBLE_EQ(4.55, value.AsFloat64());
+    } else if (key.AsInt64() == 1) {
+      EXPECT_EQ(2, value.AsInt64());
+    }
+  }
 }
 
 void IterateObject(const liteproto::Object& obj) {
