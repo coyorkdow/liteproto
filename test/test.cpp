@@ -486,7 +486,7 @@ TEST(TestMsgFundamenal, basic) {
   EXPECT_EQ(msg.foo(), 1);
   EXPECT_FLOAT_EQ(msg.bar(), 2.5);
   EXPECT_EQ(msg.baz(), "str");
-  auto tuple_ref = msg.DumpForwardTuple();
+  auto tuple_ref = msg.DumpTuple();
   std::get<0>(tuple_ref)++;
   std::get<1>(tuple_ref)--;
   std::get<2>(tuple_ref).append("str");
