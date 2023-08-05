@@ -20,10 +20,12 @@
  public:                                                                                            \
   constexpr const decltype(name##_)& name() const { return name##_; }                               \
   decltype(name##_)& mutable_##name() { return name##_; }                                           \
-  void set_##name(const decltype(name##_)& v) { name##_ = std::move(v); }                           \
+  void set_##name(const decltype(name##_)& v) { name##_ = v; }                                      \
   void set_##name(decltype(name##_)&& v) { name##_ = std::move(v); }                                \
   static constexpr decltype(auto) FIELD_name(liteproto::int32_constant<__LINE__>) { return #name; } \
-  auto FIELD_type(liteproto::int32_constant<__LINE__>)->decltype(name##_);                          \
+  constexpr decltype(auto) FIELD_ptr(liteproto::int32_constant<__LINE__>) const noexcept {          \
+    return &std::decay_t<decltype(*this)>::name##_;                                                 \
+  }                                                                                                 \
   constexpr decltype(name##_)& FIELD_value(liteproto::int32_constant<__LINE__>) { return name##_; } \
   constexpr const decltype(name##_)& FIELD_value(liteproto::int32_constant<__LINE__>) const { return name##_; }
 

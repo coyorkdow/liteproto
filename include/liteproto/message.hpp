@@ -38,13 +38,27 @@ class MessageBase : public Message {
 
  public:
   [[nodiscard]] auto DumpTuple() const noexcept { return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{}); }
-
   [[nodiscard]] auto DumpTuple() noexcept { return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{}); }
 
-  static const std::map<int32_t, const char*>& FieldsName() noexcept {
-    static const std::map<int32_t, const char*> fields_name_ =
-        MakeDynamicalFieldsName(std::make_index_sequence<FieldsIndices::value.size()>{});
-    return fields_name_;
+  Object Field(size_t index) {
+    [[maybe_unused]] static const bool dummy = ApplyReflectForEachField(static_cast<Msg*>(this), &fields_);
+    return fields_.at(FieldsIndices::value[index].first);
+  }
+  Object Field(const std::string& name) { return Field(fields_name_.at(name)); }
+
+  Object Field(size_t index) const {
+    [[maybe_unused]] static const bool dummy = ApplyReflectForEachField(static_cast<const Msg*>(this), &const_fields_);
+    return fields_.at(FieldsIndices::value[index].first);
+  }
+  Object Field(const std::string& name) const { return Field(fields_name_.at(name)); }
+
+  const std::string& FieldName(size_t index) const { return fields_name_inverse.at(index); }
+
+  size_t FieldsSize() const noexcept { return FieldsIndices::value.size(); }
+
+  template <class Tp, class Fn>
+  static constexpr auto ForEach(Fn&& fn) noexcept {
+    return ForEachImpl<Tp>(std::make_index_sequence<FieldsIndices::value.size()>{}, std::forward<Fn>(fn));
   }
 
  private:
@@ -74,24 +88,45 @@ class MessageBase : public Message {
     return std::forward_as_tuple(msg.FIELD_value(int32_constant<indices[I].second>{})...);
   }
 
-  template <size_t... I>
-  static auto MakeDynamicalFieldsName(std::index_sequence<I...>) noexcept {
-    std::map<int32_t, const char*> fields_name;
-    (GetNameForEachField<I>(&fields_name), ...);
-    return fields_name;
+  template <class Tp, class Fn, size_t... I>
+  static constexpr auto ForEachImpl(std::index_sequence<I...>, Fn&& fn) noexcept {
+    Tp res{};
+    (std::forward<Fn>(fn).template operator()<I>(&res), ...);
+    return res;
   }
 
-  template <size_t I>
-  static void GetNameForEachField(std::map<int32_t, const char*>* field_name) noexcept {
-    constexpr auto index = FieldsIndices::value[I];
-    (*field_name)[index.first] = Msg::FIELD_name(int32_constant<index.second>{});
+  struct GetName {
+    template <size_t I>
+    void operator()(std::map<std::string, size_t>* field_name) noexcept {
+      constexpr auto index = FieldsIndices::value[I];
+      (*field_name)[Msg::FIELD_name(int32_constant<index.second>{})] = I;
+    }
+  };
+
+  struct GetNameInverse {
+    template <size_t I>
+    void operator()(std::vector<std::string>* field_name) noexcept {
+      constexpr auto index = FieldsIndices::value[I];
+      field_name->emplace_back(Msg::FIELD_name(int32_constant<index.second>{}));
+    }
+  };
+
+  template <size_t I = 0, class Msg_>
+  static bool ApplyReflectForEachField(Msg_* msg, std::map<int32_t, Object>* field) {
+    if constexpr (I < FieldsIndices::value.size()) {
+      constexpr auto index = FieldsIndices::value[I];
+      field->insert(std::make_pair(index.first, GetReflection(&msg->FIELD_value(int32_constant<index.second>{}))));
+      return ApplyReflectForEachField<I + 1>(msg, field);
+    } else {
+      return true;
+    }
   }
 
-  template <size_t I, class Msg_>
-  static void ApplyReflectForEachField(Msg_&& msg, std::map<int32_t, Object>* field) {
-    constexpr auto index = FieldsIndices::value[I];
-    field->insert(std::make_pair(index.first, GetReflection(&msg.FIELD_value(int32_constant<index.second>{}))));
-  }
+  std::map<int32_t, Object> fields_;
+  mutable std::map<int32_t, Object> const_fields_;
+
+  static inline const std::map<std::string, size_t> fields_name_ = ForEach<std::map<std::string, size_t>>(GetName{});
+  static inline const std::vector<std::string> fields_name_inverse = ForEach<std::vector<std::string>>(GetNameInverse{});
 };
 
 }  // namespace liteproto

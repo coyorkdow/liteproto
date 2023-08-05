@@ -45,6 +45,8 @@ class String<ConstOption::NON_CONST> : public List<char, ConstOption::NON_CONST>
     return *this;
   }
 
+  std::string str() const { return std::string{data(), size()}; }
+
   String(const String& rhs) = default;
   String& operator=(const String&) = default;
   String(String&&) noexcept = default;
