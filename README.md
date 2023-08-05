@@ -11,25 +11,52 @@ You can define any constructor and member function for a `Message`. Moreover, a 
 
 ---
 
-```C++
-template <class T1, class T2, class T3>
-TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
-  T1 FIELD(test_field) -> Seq<1>;
-  T2 FIELD(test_field2) -> Seq<2>;
-  T3 FIELD(test_field3) -> Seq<3>;
+## Quick Start
 
-  constexpr TestMessage(T1 v1, T2 v2, T3 v3)
-      : test_field_(std::move(v1)), test_field2_(std::move(v2)), test_field3_(std::move(v3)) {}
+With the following codes, we defined a reflectable class which called `FirstMessage`. It has 5 reflectable fields. Besides, we can use it as any other normal C++ class, define the constructors, destructor, or any member function.
+
+The `StaticReflect` use the static reflection to dump all fields into a tuple. We can get or update the original object's value through this tuple. Here, we changed the message's value.
+
+Finally, we use dynamical reflection to print the structure and values of the message. Since the codes of the dyncamical reflection is complicate, we don't paste the implementation here. The full codes can be see in [example/first_message/first_message.cpp](example/first_message/first_message.cpp).
+
+```C++
+MESSAGE(FirstMessage) {
+  int FIELD(foo) -> Seq<1>;
+  double FIELD(bar) -> Seq<2>;
+  std::string FIELD(baz) -> Seq<3>;
+  std::vector<std::deque<int>> FIELD(d2list) -> Seq<4>;
+  std::list<std::string> FIELD(strlist) -> Seq<5>;
+
+  FirstMessage() : foo_(0), bar_(0) {}
 };
 
-void test() {
-  TestMessage<int, float, std::string> msg{1, 2.5, "str"};
-  auto tuple_ref = msg.DumpTuple();
-  std::get<0>(tuple_ref)++;
-  std::get<1>(tuple_ref)--;
-  std::get<2>(tuple_ref).append("str");
-  std::cout << msg.test_field(); // print 2
-  std::cout << msg.test_field2(); // print 1.5
-  std::cout << msg.test_field3(); // print strstr
+void StaticReflect(FirstMessage& msg) {
+  auto tuple = msg.DumpTuple();
+  std::get<0>(tuple)++;
+  std::get<1>(tuple) -= 5;
+  std::get<2>(tuple).append("str");
+  std::get<3>(tuple).emplace_back(std::deque{5, 6, 7});
+  std::get<4>(tuple).emplace_back("abcdefg");
 }
+
+int main() {
+  FirstMessage first_msg;
+  first_msg.set_foo(1);
+  first_msg.set_bar(1.5);
+  first_msg.set_baz("str");
+  first_msg.mutable_d2list().emplace_back(std::deque{1, 2, 3, 4});
+  first_msg.mutable_strlist().emplace_back("abc");
+  StaticReflect(first_msg);
+  DynamicalReflect(first_msg);
+  /*
+DynamicalReflect will print
+foo: 2
+bar: -3.5
+baz: "strstr"
+d2list: [[1, 2, 3, 4], [5, 6, 7]]
+strlist: ["abc", "abcdefg"]
+  */
+  return 0;
+}
+
 ```
