@@ -37,7 +37,7 @@ class List<Tp, ConstOption::NON_CONST> {
   using const_value_type = typename const_traits::value_type;
   using const_pointer = typename const_traits::pointer;
   using const_reference = typename const_traits::reference;
-  using iterator = Iterator<value_type, pointer, reference>;
+  using iterator = Iterator<value_type, pointer, reference, std::bidirectional_iterator_tag>;
   using interface = internal::ListInterface<value_type, pointer, reference, const_value_type, const_pointer, const_reference>;
 
   void push_back(const Tp& v) const { interface_->push_back(obj_, v); }
@@ -87,7 +87,7 @@ class List<Tp, ConstOption::CONST> {
   using value_type = typename traits::value_type;
   using pointer = typename traits::pointer;
   using reference = typename traits::reference;
-  using iterator = Iterator<value_type, pointer, reference>;
+  using iterator = Iterator<value_type, pointer, reference, std::bidirectional_iterator_tag>;
   using interface = internal::ListInterface<value_type, pointer, reference>;
 
   decltype(auto) operator[](size_t pos) const noexcept { return interface_->operator_subscript(obj_, pos); }
@@ -171,12 +171,12 @@ class ListAdapter<Tp, Proxy, std::enable_if_t<IsListV<Tp>>> {
   using const_value_type = typename const_traits::value_type;
   using const_pointer = typename const_traits::pointer;
   using const_reference = typename const_traits::reference;
-  using iterator = Iterator<value_type, pointer, reference>;
+  using iterator = Iterator<value_type, pointer, reference, std::bidirectional_iterator_tag>;
 
   // What is the ListAdapter for Object supposed to do?
   // It still directly accesses the indirect object inside the class. Only if when visiting through the methods,
   // the adapter creates an Object instance as the proxy of underlying indirect object.
-  using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference,
+  using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference, std::bidirectional_iterator_tag,
                                            std::conditional_t<Proxy, MakeProxyWrapper<reference>, IdentityWrapper>>;
   using const_adapter = ListAdapter<const Tp, Proxy, void>;
 

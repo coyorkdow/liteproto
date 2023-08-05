@@ -4,8 +4,8 @@
 
 #pragma once
 
-#include <type_traits>
 #include <iterator>
+#include <type_traits>
 
 using uint8_t = std::uint8_t;
 using int8_t = std::int8_t;
@@ -97,9 +97,8 @@ auto HasData(int) -> std::true_type;
 template <class C, class V>
 auto HasData(float) -> std::false_type;
 
-template <class C, class K, class V, class Iter = decltype(std::declval<C>().find(std::declval<K>())),
-          class = std::enable_if_t<std::is_same_v<const K, decltype(std::declval<Iter>()->first)> &&
-                                   std::is_same_v<V, decltype(std::declval<Iter>()->second)>>>
+template <class C, class K, class V, class Iter = decltype(std::declval<C&>().find(std::declval<K>())),
+          class = std::enable_if_t<std::is_same_v<Iter, decltype(begin(std::declval<C&>()))>>>
 auto HasFind(int) -> std::true_type;
 
 template <class C, class K, class V>
@@ -129,8 +128,13 @@ template <class C, class V, class It = decltype(begin(std::declval<C>())),
           class = decltype(std::declval<C>().insert(std::declval<It>(), std::declval<V>()))>
 auto HasInsert(int) -> std::true_type;
 
+template <class C, class V,
+          class = std::enable_if_t<
+              std::is_same_v<std::pair<decltype(begin(std::declval<C&>())), bool>, decltype(std::declval<C&>().insert(std::declval<V>()))>>>
+auto HasInsert(unsigned) -> std::true_type;
+
 template <class, class>
-auto HasInsert(float) -> std::false_type;
+auto HasInsert(...) -> std::false_type;
 
 // For builtin array compatible. All traits about the iterable and subscript operator use reference in std::declval;
 

@@ -23,14 +23,94 @@ auto AsMap(C* container) noexcept;
 template <class K, class V>
 class Map<K, V, ConstOption::NON_CONST> {
   template <class C, class>
-  friend auto AsList(C* container) noexcept;
+  friend auto AsMap(C* container) noexcept;
 
   friend class Map<K, V, ConstOption::CONST>;
 
-  //  using traits = InterfaceTraits<Tp, ConstOption::NON_CONST>;
-  //  using const_traits = InterfaceTraits<Tp, ConstOption::CONST>;
+  using key_traits = InterfaceTraits<K, ConstOption::NON_CONST>;
+  using const_key_traits = InterfaceTraits<K, ConstOption::CONST>;
+  using mapped_traits = InterfaceTraits<V, ConstOption::NON_CONST>;
+  using const_mapped_traits = InterfaceTraits<V, ConstOption::CONST>;
 
  public:
+  using key_type = typename key_traits::value_type;
+  using mapped_type = typename mapped_traits::value_type;
+  using value_type = std::pair<typename const_key_traits::value_type, mapped_type>;
+  using pointer = internal::DummyPointer;
+  using reference = std::pair<typename const_key_traits::reference, typename mapped_traits::reference>;
+  using const_value_type = std::pair<typename const_key_traits::value_type, typename const_mapped_traits::value_type>;
+  using const_pointer = internal::DummyPointer;
+  using const_reference = std::pair<typename const_key_traits::reference, typename const_mapped_traits::reference>;
+  using iterator = Iterator<value_type, pointer, reference, std::forward_iterator_tag>;
+  using interface = internal::MapInterface<value_type, pointer, reference, const_value_type, const_pointer, const_reference>;
+
+  Map(const Map& rhs) = default;
+  Map& operator=(const Map&) = default;
+  Map(Map&&) noexcept = default;
+  Map& operator=(Map&&) noexcept = default;
+
+  std::pair<iterator, bool> insert(const value_type& value) const { return interface_->insert(obj_, value); }
+  iterator find(const key_type& key) const { return interface_->find(obj_, key); }
+  iterator erase(iterator pos) const { return interface_->erase(obj_, pos); }
+  size_t erase(const key_type& key) const { return interface_->erase_key(obj_, key); }
+
+  size_t size() const noexcept { return interface_->size(obj_); }
+  bool empty() const noexcept { return interface_->empty(obj_); }
+  void clear() const { return interface_->clear(obj_); }
+
+  decltype(auto) begin() const { return interface_->begin(obj_); }
+  decltype(auto) end() const { return interface_->end(obj_); }
+
+ private:
+  template <class Adapter>
+  Map(Adapter&& adapter, const interface& interface) noexcept : obj_(std::forward<Adapter>(adapter)), interface_(&interface) {
+    static_assert(IsMapV<Map>, "Why the Map<Tp, ConstOption::NON_CONST> itself is not a Map?");
+    static_assert(std::is_nothrow_move_constructible_v<Map>);
+  }
+
+  std::any obj_;
+  const interface* interface_;
+};
+
+template <class K, class V>
+class Map<K, V, ConstOption::CONST> {
+  template <class C, class>
+  friend auto AsMap(C* container) noexcept;
+
+  using key_traits = InterfaceTraits<K, ConstOption::NON_CONST>;
+  using const_key_traits = InterfaceTraits<K, ConstOption::CONST>;
+  using mapped_traits = InterfaceTraits<V, ConstOption::CONST>;
+
+ public:
+  using key_type = typename key_traits::value_type;
+  using mapped_type = typename mapped_traits::value_type;
+  using value_type = std::pair<typename const_key_traits::value_type, mapped_type>;
+  using pointer = internal::DummyPointer;
+  using reference = std::pair<typename const_key_traits::reference, typename mapped_traits::reference>;
+  using iterator = Iterator<value_type, pointer, reference, std::forward_iterator_tag>;
+  using interface = internal::MapInterface<value_type, pointer, reference>;
+
+  Map(const Map& rhs) = default;
+  Map& operator=(const Map&) = default;
+  Map(Map&&) noexcept = default;
+  Map& operator=(Map&&) noexcept = default;
+
+  iterator find(const key_type& key) const { return interface_->find(obj_, key); }
+
+  size_t size() const noexcept { return interface_->size(obj_); }
+  bool empty() const noexcept { return interface_->empty(obj_); }
+
+  decltype(auto) begin() const { return interface_->begin(obj_); }
+  decltype(auto) end() const { return interface_->end(obj_); }
+
+ private:
+  template <class Adapter>
+  Map(Adapter&& adapter, const interface& interface) noexcept : obj_(std::forward<Adapter>(adapter)), interface_(&interface) {
+    static_assert(std::is_nothrow_move_constructible_v<Map>);
+  }
+
+  std::any obj_;
+  const interface* interface_;
 };
 
 namespace internal {
@@ -48,24 +128,24 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
   static inline constexpr bool is_const = std::is_const_v<container_type>;
 
  private:
-  using key_traits = InterfaceTraits<typename ProxyType<underlying_key_type>::type, ConstOption::CONST>;
+  using key_traits = InterfaceTraits<typename ProxyType<underlying_key_type>::type, ConstOption::NON_CONST>;
+  using const_key_traits = InterfaceTraits<typename ProxyType<underlying_key_type>::type, ConstOption::CONST>;
   using mapped_traits = InterfaceTraits<typename ProxyType<underlying_mapped_type>::type, static_cast<ConstOption>(is_const)>;
   using const_mapped_traits = InterfaceTraits<typename ProxyType<underlying_mapped_type>::type, ConstOption::CONST>;
-  using value_traits = InterfaceTraits<typename ProxyType<underlying_value_type>::type, static_cast<ConstOption>(is_const)>;
-  using const_value_traits = InterfaceTraits<typename ProxyType<underlying_value_type>::type, ConstOption::CONST>;
 
  public:
   using key_type = typename key_traits::value_type;
-  using mapped_type = typename map_traits::value_type;
-  using value_type = typename value_traits::value_type;
+  using mapped_type = typename mapped_traits::value_type;
+  using value_type = std::pair<typename const_key_traits::value_type, mapped_type>;
   using pointer = DummyPointer;
-  using reference = value_type;
-  using const_value_type = typename const_value_traits::value_type;
+  using reference = std::pair<typename const_key_traits::reference, typename mapped_traits::reference>;
+  using const_value_type = std::pair<typename const_key_traits::value_type, typename const_mapped_traits::value_type>;
   using const_pointer = DummyPointer;
-  using const_reference = const_value_type;
+  using const_reference = std::pair<typename const_key_traits::reference, typename const_mapped_traits::reference>;
   using iterator = Iterator<value_type, pointer, reference, std::forward_iterator_tag>;
 
-  using iterator_adapter = IteratorAdapter<container_type, value_type, pointer, reference, PairWrapper<reference>>;
+  using iterator_adapter =
+      IteratorAdapter<container_type, value_type, pointer, reference, std::forward_iterator_tag, PairWrapper<reference>>;
   using const_adapter = MapAdapter<const Tp, void>;
 
   explicit MapAdapter(container_type* c) noexcept : container_(c) {
@@ -94,19 +174,24 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
     return internal::MakeIterator<std::forward_iterator_tag>(std::move(it_adapter), GetIteratorInterface<decltype(it_adapter)>());
   }
 
-  template <class Value>
+  template <class Value, class = std::enable_if_t<IsPairV<std::remove_reference_t<Value>>>>
   std::pair<iterator, bool> insert(Value&& v) const {
     // If the container is const, do nothing. And it's assured that this method will never be called.
     if constexpr (is_const) {
       return std::make_pair(end(), false);
     } else {
       if constexpr (IsProxyTypeV<value_type>) {
-        auto real_v = RestoreFromProxy<underlying_value_type>(std::forward<Value>(v));
-        if (real_v.has_value()) {
-          auto [iter, ok] = container_->insert(std::move(*real_v));
-          return std::make_pair(MakeIterator(iter), ok);
+        auto value = RestoreFromProxy<underlying_mapped_type>(std::forward<Value>(v).second);
+        if (value.has_value()) {
+          if (auto key = RestoreFromProxy<underlying_key_type>(std::forward<Value>(v).first); key.has_value()) {
+            auto [iter, ok] = container_->insert(std::make_pair(std::move(key), std::move(value)));
+            return std::make_pair(MakeIterator(iter), ok);
+          } else if (auto const_key = RestoreFromProxy<const underlying_key_type>(std::forward<Value>(v).first); const_key.has_value()) {
+            auto [iter, ok] = container_->insert(std::make_pair(const_key, std::move(value)));
+            return std::make_pair(MakeIterator(iter), ok);
+          }
+          return std::make_pair(end(), false);
         }
-        return std::make_pair(end(), false);
       } else {
         auto [iter, ok] = container_->insert(std::forward<Value>(v));
         return std::make_pair(MakeIterator(iter), ok);
@@ -187,4 +272,18 @@ class MapAdapter<Tp, std::enable_if_t<IsMapV<Tp>>> {
 };
 
 }  // namespace internal
+
+template <class C, class>
+auto AsMap(C* container) noexcept {
+  internal::MapAdapter<C> adapter{container};
+
+  static_assert(std::is_trivially_copyable_v<decltype(adapter)>);
+
+  using key_type = typename internal::MapAdapter<C>::key_type;
+  using mapped_type = typename internal::MapAdapter<C>::mapped_type;
+  constexpr auto const_opt = static_cast<ConstOption>(std::is_const_v<C>);
+  Map<key_type, mapped_type, const_opt> map{adapter, internal::GetMapInterface<decltype(adapter)>()};
+  return map;
+}
+
 }  // namespace liteproto
