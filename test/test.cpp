@@ -358,6 +358,13 @@ TEST(TestMap, Basic) {
       EXPECT_EQ(2, value.AsInt64());
     }
   }
+
+  auto c_map = AsMap(static_cast<const decltype(mid)*>(&mid));
+  EXPECT_EQ(2, c_map.size());
+  EXPECT_EQ(0, (*c_map.begin()).first.AsInt64());
+  static_assert(std::is_same_v<decltype(c_map.begin()), decltype(c_map.end())>);
+  static_assert(
+      std::is_same_v<decltype(*c_map.begin()), std::pair<NumberReference<ConstOption::CONST>, NumberReference<ConstOption::CONST>>>);
 }
 
 void IterateObject(const liteproto::Object& obj) {
