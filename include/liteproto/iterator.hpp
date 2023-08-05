@@ -331,9 +331,9 @@ class IteratorAdapter {
   }
   explicit IteratorAdapter(wrapped_iterator&& it) noexcept(noexcept(wrapped_iterator{std::move(it)})) : it_(std::move(it)) {}
 
-  reference operator*() const noexcept(noexcept(*it_)) { return RefAdapter{}(*it_); }
+  reference operator*() const noexcept(noexcept(*std::declval<wrapped_iterator&>())) { return RefAdapter{}(*it_); }
 
-  pointer operator->() const noexcept(noexcept(it_.operator->())) {
+  pointer operator->() const noexcept(noexcept(std::declval<wrapped_iterator&>().operator->())) {
     if constexpr (std::is_same_v<pointer, DummyPointer>) {
       return nullptr;
     } else {
@@ -341,7 +341,7 @@ class IteratorAdapter {
     }
   }
 
-  void Increment() noexcept(noexcept(++it_)) { ++it_; }
+  void Increment() noexcept(noexcept(++std::declval<wrapped_iterator&>())) { ++it_; }
   void Decrement() noexcept(DecrementNoexceptHelper()) {
     if constexpr (is_bidirectional_iterator_v<wrapped_iterator>) {
       --it_;
@@ -367,7 +367,7 @@ class IteratorAdapter {
     return *this;
   }
 
-  IteratorAdapter& EraseMyself(container_type* container) noexcept(noexcept(container->erase(it_))) {
+  IteratorAdapter& EraseMyself(container_type* container) noexcept(noexcept(container->erase(std::declval<wrapped_iterator&>()))) {
     if constexpr (!std::is_const_v<container_type>) {
       it_ = container->erase(it_);
     }
