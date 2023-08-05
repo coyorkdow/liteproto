@@ -35,8 +35,8 @@ constexpr bool StrLiteralEQ(const char (&s1)[M], const char (&s2)[N]) {
 }
 
 template <class Tp, size_t... S1, size_t... S2>
-constexpr auto ConcatSTDArray(std::index_sequence<S1...>, std::index_sequence<S2...>,
-                              const std::array<Tp, sizeof...(S1)>& a1, const std::array<Tp, sizeof...(S2)>& a2) {
+constexpr auto ConcatSTDArray(std::index_sequence<S1...>, std::index_sequence<S2...>, const std::array<Tp, sizeof...(S1)>& a1,
+                              const std::array<Tp, sizeof...(S2)>& a2) {
   using arr = std::array<Tp, sizeof...(S1) + sizeof...(S2)>;
   return arr{a1[S1]..., a2[S2]...};
 }
@@ -55,13 +55,12 @@ constexpr auto MergeSTDArray(const std::array<Tp, S1>& a1, const std::array<Tp, 
   } else {
     using l = std::make_index_sequence<S1 - 1>;
     using r = std::make_index_sequence<S2 - 1>;
-    auto rest = MergeSTDArray(SubSTDArray<1>(l{}, a1), SubSTDArray<1>(r{}, a2));
     if (a1[0] < a2[0]) {
-      return ConcatSTDArray(std::index_sequence<0, 1>{}, std::make_index_sequence<rest.size()>{},
-                            std::array<Tp, 2>{a1[0], a2[0]}, rest);
+      auto rest = MergeSTDArray(SubSTDArray<1>(l{}, a1), a2);
+      return ConcatSTDArray(std::index_sequence<0>{}, std::make_index_sequence<rest.size()>{}, std::array<Tp, 1>{a1[0]}, rest);
     } else {
-      return ConcatSTDArray(std::index_sequence<0, 1>{}, std::make_index_sequence<rest.size()>{},
-                            std::array<Tp, 2>{a2[0], a1[0]}, rest);
+      auto rest = MergeSTDArray(a1, SubSTDArray<1>(r{}, a2));
+      return ConcatSTDArray(std::index_sequence<0>{}, std::make_index_sequence<rest.size()>{}, std::array<Tp, 1>{a2[0]}, rest);
     }
   }
 }
@@ -109,12 +108,10 @@ constexpr decltype(auto) GetAllFields() {
   constexpr auto res2 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + round_num, Tp::FIELDS_start + round_num * 2>();
   constexpr auto res3 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + round_num * 2, Tp::FIELDS_start + round_num * 3>();
   constexpr auto res4 = GetAllFieldsImpl<Tp, Tp::FIELDS_start + round_num * 3, Tp::FIELDS_start + round_num * 4>();
-  constexpr auto concat1 =
-      ConcatSTDArray(std::make_index_sequence<res1.size()>{}, std::make_index_sequence<res2.size()>{}, res1, res2);
-  constexpr auto concat2 =
-      ConcatSTDArray(std::make_index_sequence<res3.size()>{}, std::make_index_sequence<res4.size()>{}, res3, res4);
-  constexpr auto concat_final = ConcatSTDArray(std::make_index_sequence<concat1.size()>{},
-                                               std::make_index_sequence<concat2.size()>{}, concat1, concat2);
+  constexpr auto concat1 = ConcatSTDArray(std::make_index_sequence<res1.size()>{}, std::make_index_sequence<res2.size()>{}, res1, res2);
+  constexpr auto concat2 = ConcatSTDArray(std::make_index_sequence<res3.size()>{}, std::make_index_sequence<res4.size()>{}, res3, res4);
+  constexpr auto concat_final =
+      ConcatSTDArray(std::make_index_sequence<concat1.size()>{}, std::make_index_sequence<concat2.size()>{}, concat1, concat2);
   constexpr auto final = SortSTDArray(concat_final);
   static_assert(final.size() == 0 || final[0].first >= 0, "seq number must be greater than or equal to 0");
   static_assert(NoDuplicate(final), "each field must has unique seq number in a same message");
@@ -147,12 +144,10 @@ constexpr decltype(auto) GetAllFields2() {
   constexpr auto res2 = GetAllFields2Impl<Tp, Tp::FIELDS_start + round_num, Tp::FIELDS_start + round_num * 2>();
   constexpr auto res3 = GetAllFields2Impl<Tp, Tp::FIELDS_start + round_num * 2, Tp::FIELDS_start + round_num * 3>();
   constexpr auto res4 = GetAllFields2Impl<Tp, Tp::FIELDS_start + round_num * 3, Tp::FIELDS_start + round_num * 4>();
-  constexpr auto concat1 =
-      ConcatSTDArray(std::make_index_sequence<res1.size()>{}, std::make_index_sequence<res2.size()>{}, res1, res2);
-  constexpr auto concat2 =
-      ConcatSTDArray(std::make_index_sequence<res3.size()>{}, std::make_index_sequence<res4.size()>{}, res3, res4);
-  constexpr auto concat_final = ConcatSTDArray(std::make_index_sequence<concat1.size()>{},
-                                               std::make_index_sequence<concat2.size()>{}, concat1, concat2);
+  constexpr auto concat1 = ConcatSTDArray(std::make_index_sequence<res1.size()>{}, std::make_index_sequence<res2.size()>{}, res1, res2);
+  constexpr auto concat2 = ConcatSTDArray(std::make_index_sequence<res3.size()>{}, std::make_index_sequence<res4.size()>{}, res3, res4);
+  constexpr auto concat_final =
+      ConcatSTDArray(std::make_index_sequence<concat1.size()>{}, std::make_index_sequence<concat2.size()>{}, concat1, concat2);
   constexpr auto final = SortSTDArray(concat_final);
   static_assert(final.size() == 0 || final[0].first >= 0, "seq number must be greater than or equal to 0");
   static_assert(NoDuplicate(final), "each field must has unique seq number in a same message");

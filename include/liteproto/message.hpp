@@ -18,7 +18,12 @@ namespace liteproto {
 
 class Message {
  public:
- private:
+  virtual Object Field(size_t index) = 0;
+  virtual Object Field(const std::string& name) = 0;
+  virtual Object Field(size_t index) const = 0;
+  virtual Object Field(const std::string& name) const = 0;
+  virtual const std::string& FieldName(size_t index) const = 0;
+  virtual size_t FieldsSize() const noexcept = 0;
 };
 
 template <class Msg, int32_t Line>
@@ -40,21 +45,21 @@ class MessageBase : public Message {
   [[nodiscard]] auto DumpTuple() const noexcept { return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{}); }
   [[nodiscard]] auto DumpTuple() noexcept { return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{}); }
 
-  Object Field(size_t index) {
+  Object Field(size_t index) override {
     [[maybe_unused]] static const bool dummy = ApplyReflectForEachField(static_cast<Msg*>(this), &fields_);
     return fields_.at(FieldsIndices::value[index].first);
   }
-  Object Field(const std::string& name) { return Field(fields_name_.at(name)); }
+  Object Field(const std::string& name) override { return Field(fields_name_.at(name)); }
 
-  Object Field(size_t index) const {
+  Object Field(size_t index) const override {
     [[maybe_unused]] static const bool dummy = ApplyReflectForEachField(static_cast<const Msg*>(this), &const_fields_);
     return fields_.at(FieldsIndices::value[index].first);
   }
-  Object Field(const std::string& name) const { return Field(fields_name_.at(name)); }
+  Object Field(const std::string& name) const override { return Field(fields_name_.at(name)); }
 
-  const std::string& FieldName(size_t index) const { return fields_name_inverse.at(index); }
+  const std::string& FieldName(size_t index) const override { return fields_name_inverse.at(index); }
 
-  size_t FieldsSize() const noexcept { return FieldsIndices::value.size(); }
+  size_t FieldsSize() const noexcept override { return FieldsIndices::value.size(); }
 
   template <class Tp, class Fn>
   static constexpr auto ForEach(Fn&& fn) noexcept {
