@@ -312,9 +312,19 @@ class IteratorAdapter {
       std::conditional_t<std::is_const_v<container_type>, typename container_type::const_iterator, typename container_type::iterator>;
   static_assert(std::is_same_v<std::invoke_result_t<RefAdapter, typename wrapped_iterator::reference>, Reference>);
 
+ private:
+  static constexpr bool DecrementNoexceptHelper() noexcept {
+    if constexpr (is_bidirectional_iterator_v<wrapped_iterator>) {
+      return noexcept(--std::declval<wrapped_iterator&>());
+    } else {
+      return true;
+    }
+  }
+
+ public:
   explicit IteratorAdapter(const wrapped_iterator& it) noexcept(noexcept(wrapped_iterator{it})) : it_(it) {
-//    static_assert(IsProxyTypeV<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
-//                  std::is_same_v<value_type, const typename container_type::value_type>);
+    //    static_assert(IsProxyTypeV<value_type> || std::is_same_v<value_type, typename container_type::value_type> ||
+    //                  std::is_same_v<value_type, const typename container_type::value_type>);
     static_assert(std::is_copy_constructible<IteratorAdapter>::value);
     static_assert(std::is_copy_assignable<IteratorAdapter>::value);
     static_assert(std::is_swappable<IteratorAdapter>::value);
@@ -332,7 +342,7 @@ class IteratorAdapter {
   }
 
   void Increment() noexcept(noexcept(++it_)) { ++it_; }
-  void Decrement() noexcept(noexcept(--it_)) {
+  void Decrement() noexcept(DecrementNoexceptHelper()) {
     if constexpr (is_bidirectional_iterator_v<wrapped_iterator>) {
       --it_;
     }

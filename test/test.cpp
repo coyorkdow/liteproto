@@ -365,6 +365,58 @@ TEST(TestMap, Basic) {
   static_assert(std::is_same_v<decltype(c_map.begin()), decltype(c_map.end())>);
   static_assert(
       std::is_same_v<decltype(*c_map.begin()), std::pair<NumberReference<ConstOption::CONST>, NumberReference<ConstOption::CONST>>>);
+  for (auto [key, value] : c_map) {
+    EXPECT_TRUE(key.IsSignedInteger());
+    EXPECT_TRUE(value.IsFloating() && !value.IsSignedInteger() && !value.IsUnsigned());
+    if (key.AsInt64() == 0) {
+      EXPECT_DOUBLE_EQ(4.55, value.AsFloat64());
+    } else if (key.AsInt64() == 1) {
+      EXPECT_EQ(2, value.AsInt64());
+    }
+  }
+}
+
+TEST(TestMap, Unordered) {
+  using namespace liteproto;
+  std::unordered_map<long, double> mid;
+  auto map = AsMap(&mid);
+
+  map.insert(std::pair<Number, Number>{});
+  ASSERT_EQ(1, mid.size());
+  EXPECT_EQ(0, (*map.find(Number{})).second.AsInt64());
+  EXPECT_TRUE(map.find(Number{}) != map.end());
+  EXPECT_TRUE(map.find(Number{}) == map.begin());
+  EXPECT_TRUE(map.find(Number{1}) == map.end());
+  auto it = map.find(0);
+  EXPECT_TRUE((*it).second.IsFloating());
+  (*it).second.SetFloat64(4.55);
+  map.insert(std::make_pair(Number{1}, Number{2}));
+  EXPECT_EQ(2, map.size());
+  EXPECT_FALSE(map.empty());
+  for (auto [key, value] : map) {
+    EXPECT_TRUE(key.IsSignedInteger());
+    EXPECT_TRUE(value.IsFloating() && !value.IsSignedInteger() && !value.IsUnsigned());
+    if (key.AsInt64() == 0) {
+      EXPECT_DOUBLE_EQ(4.55, value.AsFloat64());
+    } else if (key.AsInt64() == 1) {
+      EXPECT_EQ(2, value.AsInt64());
+    }
+  }
+
+  auto c_map = AsMap(static_cast<const decltype(mid)*>(&mid));
+  EXPECT_EQ(2, c_map.size());
+  static_assert(std::is_same_v<decltype(c_map.begin()), decltype(c_map.end())>);
+  static_assert(
+      std::is_same_v<decltype(*c_map.begin()), std::pair<NumberReference<ConstOption::CONST>, NumberReference<ConstOption::CONST>>>);
+  for (auto [key, value] : c_map) {
+    EXPECT_TRUE(key.IsSignedInteger());
+    EXPECT_TRUE(value.IsFloating() && !value.IsSignedInteger() && !value.IsUnsigned());
+    if (key.AsInt64() == 0) {
+      EXPECT_DOUBLE_EQ(4.55, value.AsFloat64());
+    } else if (key.AsInt64() == 1) {
+      EXPECT_EQ(2, value.AsInt64());
+    }
+  }
 }
 
 void IterateObject(const liteproto::Object& obj) {
