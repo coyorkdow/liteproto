@@ -24,7 +24,7 @@ TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
 
 void test() {
   TestMessage<int, float, std::string> msg{1, 2.5, "str"};
-  auto tuple_ref = msg.DumpForwardTuple();
+  auto tuple_ref = msg.DumpTuple();
   std::get<0>(tuple_ref)++;
   std::get<1>(tuple_ref)--;
   std::get<2>(tuple_ref).append("str");

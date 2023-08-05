@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <map>
+#include <random>
 #include <tuple>
 #include <type_traits>
 
@@ -15,6 +16,25 @@
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
 #include "rapidjson/writer.h"
+
+TEST(TestUtils, Sort) {
+  using pii = std::pair<int, int>;
+  std::array<std::pair<int, int>, 5> arr{pii{1, 69}, pii{2, 70}, pii{3, 71}, pii{4, 72}, pii{5, 73}};
+  arr = liteproto::internal::SortSTDArray(arr);
+  for (int i = 1; i < 5; i++) {
+    EXPECT_LT(arr[i - 1].first, arr[i].first);
+  }
+  std::random_device rd;
+  std::mt19937 g(rd());
+
+  for (int k = 0; k < 100; k++) {
+    std::shuffle(arr.begin(), arr.end(), g);
+    arr = liteproto::internal::SortSTDArray(arr);
+    for (int i = 1; i < 5; i++) {
+      EXPECT_LT(arr[i - 1].first, arr[i].first);
+    }
+  }
+}
 
 TEST(TestNumber, Basic) {
   using namespace liteproto;
@@ -197,6 +217,7 @@ TEST(TestList, ListOfString) {
   static_assert(std::is_same_v<typename decltype(const_list)::value_type, Object>);
   static_assert(std::is_same_v<typename decltype(const_list)::reference, Object>);
   for (size_t i = 0; i < const_list.size(); i++) {
+    EXPECT_EQ(Kind::STRING, const_list[i].Descriptor().KindEnum());
     auto str_interface = StringCast(const_list[i]);
     EXPECT_FALSE(str_interface.has_value());
     auto cstr_interface = StringCast<ConstOption::CONST>(const_list[i]);
@@ -482,27 +503,42 @@ TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
 };
 
 TEST(TestMsgFundamenal, basic) {
-  TestMessage<int, float, std::string> msg{1, 2.5, "str"};
-  EXPECT_EQ(msg.foo(), 1);
-  EXPECT_FLOAT_EQ(msg.bar(), 2.5);
-  EXPECT_EQ(msg.baz(), "str");
-  auto tuple_ref = msg.DumpForwardTuple();
+  TestMessage<int, float, std::string> my_msg{1, 2.5, "str"};
+  EXPECT_EQ(my_msg.foo(), 1);
+  EXPECT_FLOAT_EQ(my_msg.bar(), 2.5);
+  EXPECT_EQ(my_msg.baz(), "str");
+  auto tuple_ref = my_msg.DumpTuple();
   std::get<0>(tuple_ref)++;
   std::get<1>(tuple_ref)--;
   std::get<2>(tuple_ref).append("str");
-  EXPECT_EQ(msg.foo(), 2);
-  EXPECT_FLOAT_EQ(msg.bar(), 1.5);
-  EXPECT_EQ(msg.baz(), "strstr");
+  EXPECT_EQ(my_msg.foo(), 2);
+  EXPECT_FLOAT_EQ(my_msg.bar(), 1.5);
+  EXPECT_EQ(my_msg.baz(), "strstr");
 
-  auto& names = decltype(msg)::FieldsName();
-  for (auto& [i, name] : names) {
-    EXPECT_TRUE(i == 1 || i == 2 || i == 3);
-    if (i == 1) {
-      EXPECT_EQ(name, "foo");
+  liteproto::Object obj;
+  liteproto::Message& msg = my_msg;
+  for (size_t i = 0; i < msg.FieldsSize(); i++) {
+    if (i == 0) {
+      EXPECT_EQ("foo", msg.FieldName(i));
+      obj = msg.Field(i);
+      EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
+      auto number = liteproto::NumberCast(obj);
+      ASSERT_TRUE(number.has_value());
+      EXPECT_EQ(2, number->AsInt64());
+    } else if (i == 1) {
+      EXPECT_EQ("bar", msg.FieldName(i));
+      obj = msg.Field(i);
+      EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
+      auto number = liteproto::NumberCast(obj);
+      ASSERT_TRUE(number.has_value());
+      EXPECT_DOUBLE_EQ(1.5, number->AsFloat64());
     } else if (i == 2) {
-      EXPECT_EQ(name, "bar");
-    } else if (i == 3) {
-      EXPECT_EQ(name, "baz");
+      EXPECT_EQ("baz", msg.FieldName(i));
+      obj = msg.Field(i);
+      EXPECT_EQ(liteproto::Kind::STRING, obj.Descriptor().KindEnum());
+      auto str = liteproto::StringCast(obj);
+      ASSERT_TRUE(str.has_value());
+      EXPECT_EQ("strstr", str->str());
     }
   }
 }
