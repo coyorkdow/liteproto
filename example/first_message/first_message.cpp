@@ -92,6 +92,13 @@ int main() {
   first_msg.mutable_strlist().emplace_back("abc");
   StaticReflect(first_msg);
   DynamicalReflect(first_msg);
-
+  /*
+DynamicalReflect will print
+foo: 2\
+bar: -3.5
+baz: "strstr"
+d2list: [[1, 2, 3, 4], [5, 6, 7]]
+strlist: ["abc", "abcdefg"]
+  */
   return 0;
 }

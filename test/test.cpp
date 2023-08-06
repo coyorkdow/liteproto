@@ -516,29 +516,69 @@ TEST(TestMsgFundamenal, basic) {
   EXPECT_EQ(my_msg.baz(), "strstr");
 
   liteproto::Object obj;
-  liteproto::Message& msg = my_msg;
-  for (size_t i = 0; i < msg.FieldsSize(); i++) {
-    if (i == 0) {
-      EXPECT_EQ("foo", msg.FieldName(i));
-      obj = msg.Field(i);
-      EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
-      auto number = liteproto::NumberCast(obj);
-      ASSERT_TRUE(number.has_value());
-      EXPECT_EQ(2, number->AsInt64());
-    } else if (i == 1) {
-      EXPECT_EQ("bar", msg.FieldName(i));
-      obj = msg.Field(i);
-      EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
-      auto number = liteproto::NumberCast(obj);
-      ASSERT_TRUE(number.has_value());
-      EXPECT_DOUBLE_EQ(1.5, number->AsFloat64());
-    } else if (i == 2) {
-      EXPECT_EQ("baz", msg.FieldName(i));
-      obj = msg.Field(i);
-      EXPECT_EQ(liteproto::Kind::STRING, obj.Descriptor().KindEnum());
-      auto str = liteproto::StringCast(obj);
-      ASSERT_TRUE(str.has_value());
-      EXPECT_EQ("strstr", str->str());
+  {
+    liteproto::Message& msg = my_msg;
+    EXPECT_TRUE(msg.HasName("foo"));
+    EXPECT_TRUE(msg.HasName("bar"));
+    EXPECT_TRUE(msg.HasName("baz"));
+    EXPECT_FALSE(msg.HasName("noexist"));
+    for (size_t i = 0; i < msg.FieldsSize(); i++) {
+      if (i == 0) {
+        EXPECT_EQ("foo", msg.FieldName(i));
+        obj = msg.Field(i);
+        EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
+        auto number = liteproto::NumberCast(obj);
+        ASSERT_TRUE(number.has_value());
+        EXPECT_EQ(2, number->AsInt64());
+      } else if (i == 1) {
+        EXPECT_EQ("bar", msg.FieldName(i));
+        obj = msg.Field(i);
+        EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
+        auto number = liteproto::NumberCast(obj);
+        ASSERT_TRUE(number.has_value());
+        EXPECT_DOUBLE_EQ(1.5, number->AsFloat64());
+      } else if (i == 2) {
+        EXPECT_EQ("baz", msg.FieldName(i));
+        obj = msg.Field(i);
+        EXPECT_EQ(liteproto::Kind::STRING, obj.Descriptor().KindEnum());
+        auto str = liteproto::StringCast(obj);
+        ASSERT_TRUE(str.has_value());
+        EXPECT_EQ("strstr", str->str());
+      }
+    }
+  }
+  {
+    const liteproto::Message& msg = my_msg;
+    EXPECT_TRUE(msg.HasName("foo"));
+    EXPECT_TRUE(msg.HasName("bar"));
+    EXPECT_TRUE(msg.HasName("baz"));
+    EXPECT_FALSE(msg.HasName("noexist"));
+    for (size_t i = 0; i < msg.FieldsSize(); i++) {
+      if (i == 0) {
+        EXPECT_EQ("foo", msg.FieldName(i));
+        obj = msg.Field(i);
+        EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
+        ASSERT_TRUE(obj.Descriptor().Traits(liteproto::traits::is_const));
+        auto number = liteproto::NumberCast<liteproto::ConstOption::CONST>(obj);
+        ASSERT_TRUE(number.has_value());
+        EXPECT_EQ(2, number->AsInt64());
+      } else if (i == 1) {
+        EXPECT_EQ("bar", msg.FieldName(i));
+        obj = msg.Field(i);
+        EXPECT_EQ(liteproto::Kind::NUMBER, obj.Descriptor().KindEnum());
+        ASSERT_TRUE(obj.Descriptor().Traits(liteproto::traits::is_const));
+        auto number = liteproto::NumberCast<liteproto::ConstOption::CONST>(obj);
+        ASSERT_TRUE(number.has_value());
+        EXPECT_DOUBLE_EQ(1.5, number->AsFloat64());
+      } else if (i == 2) {
+        EXPECT_EQ("baz", msg.FieldName(i));
+        obj = msg.Field(i);
+        EXPECT_EQ(liteproto::Kind::STRING, obj.Descriptor().KindEnum());
+        ASSERT_TRUE(obj.Descriptor().Traits(liteproto::traits::is_const));
+        auto str = liteproto::StringCast<liteproto::ConstOption::CONST>(obj);
+        ASSERT_TRUE(str.has_value());
+        EXPECT_EQ("strstr", str->str());
+      }
     }
   }
 }

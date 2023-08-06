@@ -76,6 +76,8 @@ class String<ConstOption::CONST> : public List<char, ConstOption::CONST> {
   const char* data() const { return string_interface_->data(list_base::obj_); }
   const char* c_str() const noexcept { return string_interface_->c_str(list_base::obj_); }
 
+  std::string str() const { return std::string{data(), size()}; }
+
   String(const String& rhs) = default;
   String& operator=(const String&) = default;
   String(String&&) noexcept = default;

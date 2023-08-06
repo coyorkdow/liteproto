@@ -23,6 +23,7 @@ class Message {
   virtual Object Field(size_t index) const = 0;
   virtual Object Field(const std::string& name) const = 0;
   virtual const std::string& FieldName(size_t index) const = 0;
+  virtual bool HasName(const std::string& name) const = 0;
   virtual size_t FieldsSize() const noexcept = 0;
 };
 
@@ -53,11 +54,12 @@ class MessageBase : public Message {
 
   Object Field(size_t index) const override {
     [[maybe_unused]] static const bool dummy = ApplyReflectForEachField(static_cast<const Msg*>(this), &const_fields_);
-    return fields_.at(FieldsIndices::value[index].first);
+    return const_fields_.at(FieldsIndices::value[index].first);
   }
   Object Field(const std::string& name) const override { return Field(fields_name_.at(name)); }
 
-  const std::string& FieldName(size_t index) const override { return fields_name_inverse.at(index); }
+  const std::string& FieldName(size_t index) const override { return fields_name_inverse_.at(index); }
+  bool HasName(const std::string& name) const override { return fields_name_.count(name); }
 
   size_t FieldsSize() const noexcept override { return FieldsIndices::value.size(); }
 
@@ -131,7 +133,7 @@ class MessageBase : public Message {
   mutable std::map<int32_t, Object> const_fields_;
 
   static inline const std::map<std::string, size_t> fields_name_ = ForEach<std::map<std::string, size_t>>(GetName{});
-  static inline const std::vector<std::string> fields_name_inverse = ForEach<std::vector<std::string>>(GetNameInverse{});
+  static inline const std::vector<std::string> fields_name_inverse_ = ForEach<std::vector<std::string>>(GetNameInverse{});
 };
 
 }  // namespace liteproto
