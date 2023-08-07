@@ -39,6 +39,23 @@ void StaticReflect(FirstMessage& msg) {
   std::get<4>(tuple).emplace_back("abcdefg");
 }
 
+void DynamicalReflect(liteproto::Message& msg) {
+  for (size_t i = 0; i < msg.FieldsSize(); i++) {
+    std::cout << msg.FieldName(i) << ": ";
+    liteproto::Object object = msg.Field(i);
+    if (object.Descriptor().KindEnum() == liteproto::Kind::NUMBER) {
+      auto number = liteproto::NumberCast(object);  // number is a std::optional
+      PrintNumber(number.value());
+    } else if (object.Descriptor().KindEnum() == liteproto::Kind::STRING) {
+      auto str = liteproto::StringCast(object);
+      std::cout << '\"' << str->str() << '\"';
+    } else if (object.Descriptor().KindEnum() == liteproto::Kind::LIST) {
+      PrintDynamicalList(object);
+    }
+    std::cout << '\n';
+  }
+}
+
 int main() {
   FirstMessage first_msg;
   first_msg.set_foo(1);
