@@ -1,5 +1,5 @@
 # liteproto
-A lite serialization and reflection library of C++
+A native C++17 reflection and serialization library.
 
 Define a serializable class (called `Message`), and use reflection to inspect and modify its fields. Meanwhile you can use this class just like any other class.
 The principle of the liteproto is to use Macro as little as possible, and make the syntax as close as possible to the C++'s native class definition.
