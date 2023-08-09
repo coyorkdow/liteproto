@@ -7,6 +7,7 @@
 #include <array>
 #include <type_traits>
 #include <utility>
+#include <variant>
 
 #ifndef LITE_PROTO_SCAN_FIELD_RANGE_
 #define LITE_PROTO_SCAN_FIELD_RANGE_ 192
