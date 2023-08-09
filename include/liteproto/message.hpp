@@ -42,9 +42,28 @@ class MessageBase : public Message {
 #endif
   };
 
+  struct VariantType {
+   private:
+    static constexpr auto indices = FieldsIndices::value;
+    template <size_t... I>
+    static auto VariantTypeHelper(std::index_sequence<I...>)
+        -> std::variant<decltype(std::declval<Msg>().FIELD_ptr(int32_constant<indices[I].second>{}))...>;
+
+   public:
+    using type = decltype(VariantTypeHelper(std::make_index_sequence<FieldsIndices::value.size()>{}));
+  };
+
  public:
   [[nodiscard]] auto DumpTuple() const noexcept { return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{}); }
   [[nodiscard]] auto DumpTuple() noexcept { return DumpTupleImpl(std::make_index_sequence<FieldsIndices::value.size()>{}); }
+
+  template <class Fn>
+  void Visit(size_t index, Fn&& fn) {
+    std::visit([this, fn = std::forward<Fn>(fn)](auto&& ptr) {
+      auto& msg = static_cast<Msg&>(*this);
+      fn(msg.*ptr);
+    }, VariantArr()[index]);
+  }
 
   Object Field(size_t index) override {
     [[maybe_unused]] static const bool dummy = ApplyReflectForEachField(static_cast<Msg*>(this), &fields_);
@@ -95,6 +114,19 @@ class MessageBase : public Message {
     return std::forward_as_tuple(msg.FIELD_value(int32_constant<indices[I].second>{})...);
   }
 
+  template <size_t... I>
+  [[nodiscard]] static constexpr auto MakeVariantArrImpl(std::index_sequence<I...>) noexcept {
+    return std::array{MakeVariant<I>()...};
+  }
+
+  template <size_t I>
+  static constexpr auto MakeVariant() noexcept {
+    using var_t = typename VariantType::type;
+    constexpr auto indices = FieldsIndices::value;
+    auto pseudo_obj = static_cast<Msg*>(nullptr);
+    return var_t{pseudo_obj->FIELD_ptr(int32_constant<indices[I].second>{})};
+  }
+
   template <class Tp, class Fn, size_t... I>
   static constexpr auto ForEachImpl(std::index_sequence<I...>, Fn&& fn) noexcept {
     Tp res{};
@@ -127,6 +159,11 @@ class MessageBase : public Message {
     } else {
       return true;
     }
+  }
+
+  static decltype(auto) VariantArr() noexcept {
+    static const auto arr = MakeVariantArrImpl(std::make_index_sequence<FieldsIndices::value.size()>{});
+    return arr;
   }
 
   std::map<int32_t, Object> fields_;

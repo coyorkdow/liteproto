@@ -36,3 +36,4 @@ target_link_libraries(liteproto_test liteproto gmock gtest gtest_main)
 add_test(NAME closure_test COMMAND closure_test)
 
 add_subdirectory(example/first_message)
+add_subdirectory(example/variant_visit)

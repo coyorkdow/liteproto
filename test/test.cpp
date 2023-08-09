@@ -502,7 +502,7 @@ TEMPLATE_MESSAGE(TestMessage, $(T1, T2, T3)) {
   TestMessage(T1 v1, T2 v2, T3 v3) noexcept : foo_(std::move(v1)), bar_(std::move(v2)), baz_(std::move(v3)) {}
 };
 
-TEST(TestMsgFundamenal, basic) {
+TEST(TestMessage, basic) {
   TestMessage<int, float, std::string> my_msg{1, 2.5, "str"};
   EXPECT_EQ(my_msg.foo(), 1);
   EXPECT_FLOAT_EQ(my_msg.bar(), 2.5);
@@ -581,6 +581,30 @@ TEST(TestMsgFundamenal, basic) {
       }
     }
   }
+}
+
+TEST(TestMessage, Variant) {
+  TestMessage<int, float, std::string> my_msg{1, 2.5, "str"};
+  auto ptr_foo = my_msg.FIELD_ptr(liteproto::int32_constant<498>{});
+  EXPECT_EQ(1, my_msg.*ptr_foo);
+  auto ptr_bar = my_msg.FIELD_ptr(liteproto::int32_constant<499>{});
+  EXPECT_DOUBLE_EQ(2.5, my_msg.*ptr_bar);
+  auto ptr_baz = my_msg.FIELD_ptr(liteproto::int32_constant<500>{});
+  EXPECT_EQ("str", my_msg.*ptr_baz);
+  for (size_t i = 0; i < my_msg.FieldsSize(); i++) {
+    my_msg.Visit(i, [](auto&& value) {
+      std::cout << value;
+      std::cout << '\n';
+      if constexpr (std::is_same_v<std::string, std::decay_t<decltype(value)>>) {
+        value.append("str");
+      } else {
+        value--;
+      }
+    });
+  }
+  EXPECT_EQ(0, my_msg.foo());
+  EXPECT_DOUBLE_EQ(1.5, my_msg.bar());
+  EXPECT_EQ("strstr", my_msg.baz());
 }
 
 TEST(Test3rd, RapidJson) {
